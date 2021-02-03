@@ -1,4 +1,28 @@
 
+
+process IndexBamFile {
+    label 'cpus_16'
+    label 'container_llab'
+    tag {idPatient + "-" + idSample}
+    
+    publishDir "${params.outdir}/Preprocessing/${idSample}/Bams/", mode: params.publish_dir_mode
+
+    input:
+        tuple idPatient, idSample, file(bam)
+
+    output:
+        tuple idPatient, idSample, file(bam), file("${bam.baseName}.bai")
+
+    // when: !params.knownIndels
+
+    script:
+    """
+    init.sh
+    samtools index ${bam}
+    mv ${bam}.bai ${bam.baseName}.bai
+    """
+}
+
 process ConcatVCF {
     label 'cpus_8'
 
@@ -224,6 +248,8 @@ def printSummary(params){
     if (params.fasta_gz_fai)          summary['fasta_gz_fai']        = params.fasta_fai
     if (params.fasta_gzi)              summary['fasta_gzi']              = params.fasta_gzi
 
+    if (params.filter_bams)                  summary['filter_bams']                  = params.filter_bams
+    if (params.bam_mapping_q)                  summary['bam_mapping_q']                  = params.bam_mapping_q
     if (params.dict)                  summary['dict']                  = params.dict
     if (params.bwa_index)              summary['bwa_index']              = params.bwa_index
     if (params.germline_resource)      summary['germline_resource']      = params.germline_resource

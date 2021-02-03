@@ -3,7 +3,8 @@ tools = params.globals.tools
 status_map = params.globals.status_map
 gender_map = params.globals.gender_map
 include {hasExtension} from './utility'
-workflow wf_map_reads{
+// include {IndexBamFile} from './utility'
+workflow wf_map_partial_reads{
     take: _input_samples
     take: _fasta
     take: _fasta_fai
@@ -36,39 +37,46 @@ workflow wf_map_reads{
             _fasta_fai,
             _bwa_index
         )
-        // Now group the partial (mapped) bams according to the patient_id, and sample_id
-        _grouped_bam_mapped = MapReads.out.groupTuple(by:[0, 1])
-        
-
-        _bams_for_merge = _grouped_bam_mapped
-                        .map{idPatient, idSample, idRun, bams -> 
-                        [ idPatient, idSample, idRun, _bam_suffix, bams ]
-                        }
-
-        // MapReads.out.bam_mapped.map{idPatient, idSample, idRun, bams -> 
-        //     [ idPatient, idSample, idRun, _bam_suffix, bams ]
+        // Now we need to see if we need to filter the raw bams depending upon passed parameter
+        // if(params.filter_bams){
+        //     wf_qc_filter_mapped_reads(MapReads.out.bam_mapped)
+        //     _out_bams = wf_qc_filter_mapped_reads.out.merged_bams
         // }
-        // Now merge the grouped bams back to a single bam per sample
-        MergeBamMapped(_bams_for_merge)
-        IndexBamFile(MergeBamMapped.out)
+
+        // Now group the partial (mapped) bams according to the patient_id, and sample_id
+        // _grouped_bam_mapped = MapReads.out.groupTuple(by:[0, 1])
         
 
-        // Creating a TSV file to restart from this step
-        IndexBamFile.out
-        .map { idPatient, idSample, bamFile, baiFile ->
-            status = status_map[idPatient, idSample]
-            gender = gender_map[idPatient]
-            bam = "${params.outdir}/Preprocessing/${idSample}/Bams/${idSample}${_bam_suffix}.bam"
-            bai = "${params.outdir}/Preprocessing/${idSample}/Bams/${idSample}${_bam_suffix}.bai"
-            bam_file = file(bam)
-            bai_file = file(bai)
-            "${idPatient}\t${gender}\t${status}\t${idSample}\t${bam_file}\t${bai_file}\n"
-        }.collectFile(
-            name: "mapped_bam${_bam_suffix}.tsv", sort: true, storeDir: "${params.outdir}/Preprocessing/TSV"
-        )
+        // _bams_for_merge = _grouped_bam_mapped
+        //                 .map{idPatient, idSample, idRun, bams -> 
+        //                 [ idPatient, idSample, idRun, _bam_suffix, bams ]
+        //                 }
+
+        // // MapReads.out.bam_mapped.map{idPatient, idSample, idRun, bams -> 
+        // //     [ idPatient, idSample, idRun, _bam_suffix, bams ]
+        // // }
+        // // Now merge the grouped bams back to a single bam per sample
+        // MergeBamMapped(_bams_for_merge)
+        // IndexBamFile(MergeBamMapped.out)
+        
+
+        // // Creating a TSV file to restart from this step
+        // IndexBamFile.out
+        // .map { idPatient, idSample, bamFile, baiFile ->
+        //     status = status_map[idPatient, idSample]
+        //     gender = gender_map[idPatient]
+        //     bam = "${params.outdir}/Preprocessing/${idSample}/Bams/${idSample}${_bam_suffix}.bam"
+        //     bai = "${params.outdir}/Preprocessing/${idSample}/Bams/${idSample}${_bam_suffix}.bai"
+        //     bam_file = file(bam)
+        //     bai_file = file(bai)
+        //     "${idPatient}\t${gender}\t${status}\t${idSample}\t${bam_file}\t${bai_file}\n"
+        // }.collectFile(
+        //     name: "mapped_bam${_bam_suffix}.tsv", sort: true, storeDir: "${params.outdir}/Preprocessing/TSV"
+        // )
                               
     emit:
-        bams_mapped = IndexBamFile.out
+        // bams_mapped = IndexBamFile.out
+        _mapped_partial_reads = MapReads.out
         // bams_mapped_qc = _out_bams_qc
 } // end of wf_map_reads
 
@@ -199,47 +207,24 @@ process MapReads {
     """
 }
 
-// STEP 1.5: MERGING BAM FROM MULTIPLE LANES
-process MergeBamMapped {
-    label 'cpus_16'
-    label 'container_llab'
-    tag {idPatient + "-" + idSample}
+// // STEP 1.5: MERGING BAM FROM MULTIPLE LANES
+// process MergeBamMapped {
+//     label 'cpus_16'
+//     label 'container_llab'
+//     tag {idPatient + "-" + idSample}
 
-    input:
-        tuple idPatient, idSample, idRun, out_suffix, file(bams)
-        // tuple idPatient, idSample, idRun, file(bam), val bam_type
+//     input:
+//         tuple idPatient, idSample, idRun, out_suffix, file(bams)
+//         // tuple idPatient, idSample, idRun, file(bam), val bam_type
 
-    output:
-        tuple idPatient, idSample,  file("${idSample}${out_suffix}.bam")
+//     output:
+//         tuple idPatient, idSample,  file("${idSample}${out_suffix}.bam")
 
-    script:
-    // suffix = bams.first().minus("${idSample}_${idRun}")
-    // out_file = "${idSample}${suffix}"
-    """
-    init.sh
-    samtools merge --threads ${task.cpus} "${idSample}${out_suffix}.bam" ${bams}
-    """
-}
-
-process IndexBamFile {
-    label 'cpus_16'
-    label 'container_llab'
-    tag {idPatient + "-" + idSample}
-    
-    publishDir "${params.outdir}/Preprocessing/${idSample}/Bams/", mode: params.publish_dir_mode
-
-    input:
-        tuple idPatient, idSample, file(bam)
-
-    output:
-        tuple idPatient, idSample, file(bam), file("${bam.baseName}.bai")
-
-    // when: !params.knownIndels
-
-    script:
-    """
-    init.sh
-    samtools index ${bam}
-    mv ${bam}.bai ${bam.baseName}.bai
-    """
-}
+//     script:
+//     // suffix = bams.first().minus("${idSample}_${idRun}")
+//     // out_file = "${idSample}${suffix}"
+//     """
+//     init.sh
+//     samtools merge --threads ${task.cpus} "${idSample}${out_suffix}.bam" ${bams}
+//     """
+// }

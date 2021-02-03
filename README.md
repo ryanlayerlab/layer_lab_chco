@@ -1,4 +1,4 @@
-# Layer Lab Cancer Analysis Workflow
+# Layer Lab NGS Analysis Workflow (for CHCO)
  `PLEASE NOTE THAT THIS IS VERY MUCH A WORK IN PROGRESS AND THE CONFIGURATION AND THE CODE MIGHT NEED TWEAKING BEFORE RUNNING THE PIPELINE`
 
 The pipeline is implemented in  [nextflow](https://www.nextflow.io) and implements the following workflows.

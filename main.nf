@@ -232,7 +232,9 @@ include {wf_get_software_versions} from './lib/wf_get_software_versions'
 include {wf_build_indexes} from './lib/wf_build_indexes' 
 include {wf_build_intervals} from './lib/wf_build_intervals' 
 include {wf_fastqc_fq} from './lib/wf_fastqc_fq' 
-include {wf_map_reads} from './lib/wf_map_reads' 
+include {wf_map_partial_reads} from './lib/wf_map_partial_reads' 
+include {wf_gather_mapped_partial_reads} from './lib/wf_gather_mapped_partial_reads' 
+include {wf_filter_and_gather_mapped_partial_reads} from './lib/wf_filter_and_gather_mapped_partial_reads' 
 include {wf_qc_bam_mapped} from './lib/wf_qc_bam_mapped' 
 include {wf_mark_duplicates} from './lib/wf_mark_duplicates' 
 include {wf_somalier_extraction} from './lib/wf_somalier_extraction' 
@@ -283,18 +285,41 @@ workflow{
     
     // FastQCFQ(ch_input_sample)     
     ch_bam_mapped = Channel.empty()
+    ch_bam_mapped_raw = Channel.empty()
     ch_fastqc_report = Channel.empty()
     
     if (step == 'mapping'){
         wf_fastqc_fq(ch_input_sample)
-        wf_map_reads(ch_input_sample,
+        // split the fastqs and map the partial fastqs
+        wf_map_partial_reads(ch_input_sample,
                     ch_fasta,
                     ch_fasta_fai,
                     ch_bwa_index
         )
-        ch_bam_mapped = wf_map_reads.out.bams_mapped
+        ch_partial_mapped_reads = wf_map_partial_reads.out
+        // gather the partial mapped reads to merge them per sample
+        wf_gather_mapped_partial_reads(ch_partial_mapped_reads,
+                                ch_fasta,
+                                ch_fasta_fai,
+                                ch_bwa_index,
+                                '')
+        ch_bam_mapped = wf_gather_mapped_partial_reads.out.bams_mapped
+        // Now we check if we need to filter the bams
+        if (params.filter_bams){
+            // In this case we'll use the filtered bams for most downstream analyses
+            // We still keep the raw (unfiltered bams) around for copy number callers
+            // ch_partial_mapped_reads.dump(tag:'target for filtering:')
+            wf_filter_and_gather_mapped_partial_reads(ch_partial_mapped_reads,
+                                ch_fasta,
+                                ch_fasta_fai,
+                                ch_bwa_index,
+                                "_pq${params.bam_mapping_q}")
+            ch_bam_mapped_raw = ch_bam_mapped
+            ch_bam_mapped = wf_filter_and_gather_mapped_partial_reads.out
+        }
+            
         ch_fastqc_report = wf_fastqc_fq.out.fastqc_reports.collect()
-    }
+    } 
 
     // If the pipeline is being started from the step 'markdups'
     // use bams from the provided tsv
