@@ -1,11 +1,14 @@
 tools = params.globals.tools
-
+status_map = params.globals.status_map
+gender_map = params.globals.gender_map
+// tools = params.globals.tools
 include {ConcatVCF} from './utility'
 workflow wf_haplotypecaller{
     take: _int_bam_recal
     take: _fasta
     take: _fasta_fai
     take: _dict
+    take: _target_bed
     take: _dbsnp
     take: _dbsnp_index
     // take: _bed_intervls
@@ -18,10 +21,41 @@ workflow wf_haplotypecaller{
             _dbsnp,
             _dbsnp_index
         )
+     // Create individual gvcfs without any genotyping
+     gvcf_ConcatVCF = 
+            HaplotypeCaller.out.gvcf_GenotypeGVCFs
+            .groupTuple(by: [0,1])
+            .map{ idPatient, idSample, interval_beds,  gvcfs -> 
+                ['HaplotypeCaller_gvcf', idPatient, idSample, gvcfs]
+            }
+            // .dump(tag: "gvcfs_ConcatVcf")
+
+    ConcatVCF(
+                gvcf_ConcatVCF,
+                _fasta_fai,
+                _target_bed,
+                '', // prefix for output files
+                'g.vcf', // extension for the output files
+                'HC_individually_genotyped_gvcf' // output directory name
+                )
+
+     ConcatVCF.out.concatenated_vcf_with_index
+        .map { vc, idPatient, idSample, gvcfFile, tbiFile ->
+            status = status_map[idPatient, idSample]
+            gender = gender_map[idPatient]
+            gvcf = "${params.outdir}/VariantCalling/${idSample}/HC_individually_genotyped_gvcf/${idSample}.g.vcf.gz"
+            tbi = "${params.outdir}/VariantCalling/${idSample}/HC_individually_genotyped_gvcf/${idSample}.g.vcf.gz.tbi"
+            gvcf_file = file(gvcf)
+            tbi_file = file(tbi)
+            "${idPatient}\t${gender}\t${status}\t${idSample}\t${gvcf_file}\t${tbi_file}\n"
+        }.collectFile(
+            name: "individually_genotyped_gvcfs.tsv", sort: true, storeDir: "${params.outdir}/Preprocessing/TSV"
+        )
 
     emit: 
         gvcf_HC = HaplotypeCaller.out.gvcf_HC
         gvcf_GenotypeGVCFs = HaplotypeCaller.out.gvcf_GenotypeGVCFs
+        gvcf_per_sample = ConcatVCF.out.concatenated_vcf_with_index
 } //  end of wf_haplotypecaller
 
 

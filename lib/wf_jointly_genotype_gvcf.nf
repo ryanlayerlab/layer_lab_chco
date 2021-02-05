@@ -1,84 +1,91 @@
 tools = params.globals.tools
-
 include {ConcatVCF} from './utility'
 workflow wf_jointly_genotype_gvcf{
-    // input _scattered_gvcf_HC structure 
-    // tuple idPatient, idSample, file(intervalBed), file("${intervalBed.baseName}_${idSample}.g.vcf")
-    take: _scattered_gvcf_HC
-    take: _target_bed
-     take: _fasta
+    take: _sample_ids
+    take: _gvcfs
+    take: _tbis
+    take: _fasta
     take: _fasta_fai
+    take: _bed_intervls
+    take: _target_bed
     take: _dict
     take: _dbsnp
     take: _dbsnp_index
     // take: _bed_intervls
     main:
-    // Transform the haplotypecaller output in the above format to a format where gvcf's are gathered per interval, so carry
-    // multiple gvcf (for multiple samples)
-    // When grouping gvcf's for per interval basis, we only keep one interval bed as the list carry same intervals for each group
-    // This interval then become the key, and a disnguishing element for this joint genotyping
-    // patientSampleIdMap will have all the samples names that has a gvcf in a particular group
-
-    mapped_gvcf_GenotypeGVCFs = _scattered_gvcf_HC
-                                .map{idPatient, idSample, intervalBed, gvcf ->
-                                patientSampleIdMap = [:]
-                                patientSampleIdMap['idPatient'] = idPatient
-                                patientSampleIdMap['idSample'] = idSample
-                                [intervalBed.baseName, intervalBed, patientSampleIdMap , gvcf]}
-                                .groupTuple(by:[0])
-                                .map{interval_name, liIntervalBed, patientSampleIdMap, liGvcf -> 
-                                    [interval_name, liIntervalBed.first(), patientSampleIdMap, liGvcf]
-                                    }
-                                // .dump(tag: 'Collected HaplotypeCaller output')
     
-    
-    GenomicsDBImport(mapped_gvcf_GenotypeGVCFs)                              
+    CombineGVCFs(
+        _gvcfs,
+        _tbis,
+        _fasta,
+        _fasta_fai,
+        _dict
+    )
+    // Create a cartesian product of the cohort gvcf and the interval files
+    // for parallelization
+    ch_int_cohort_gvcf = CombineGVCFs.out.combine(_bed_intervls)
+                        //.dump(tag: 'joint_genotype_parallelisation: ')
+    // // GenomicsDBImport(mapped_gvcf_GenotypeGVCFs)             
+    // _fasta.dump(tag:'fasta')                 
+    // _fasta_fai.dump(tag:'fasta_fai')                 
+    // _dict.dump(tag:'dict')                 
+    // _dbsnp.dump(tag:'dbsnp')                 
+    // _dbsnp_index.dump(tag:'_dbsnp_index')
     GenotypeGVCFs(
-        GenomicsDBImport.out,
+        ch_int_cohort_gvcf,
         _fasta,
         _fasta_fai,
         _dict,
         _dbsnp,
         _dbsnp_index
     )
-    // GenotypeGVCFs output
-    //tuple val("HaplotypeCaller"),  val(patientSampleIdMap), file(interval_bed), file("vcf"), file("vcf.idx")
     
-    // A Cohort vcf
-    vcf_cohort_concatenate_vcf = GenotypeGVCFs.out.vcf_GenotypeGVCFs
-    .map{caller, li_patient_sample_id_map, interval_bed,  vcf, vcf_idx ->
-        [vcf]
-    }
-    .collect()
-    // .dump(tag: 'cohor_vcf: ')
+    // // GenotypeGVCFs output
+    // //tuple val("HaplotypeCaller"),  val(patientSampleIdMap), file(interval_bed), file("vcf"), file("vcf.idx")
+    
+    // // A Cohort vcf
+    // vcf_cohort_concatenate_vcf = GenotypeGVCFs.out.vcf_GenotypeGVCFs
+    // .map{caller, li_patient_sample_id_map, interval_bed,  vcf, vcf_idx ->
+    //     [vcf]
+    // }
+    // .collect()
+    // // .dump(tag: 'cohor_vcf: ')
 
     CohortConcatVCF(
-        vcf_cohort_concatenate_vcf,
+        GenotypeGVCFs.out[0].collect(),
+        GenotypeGVCFs.out[1].collect(),
         _fasta_fai,
         _target_bed,
     )
-
-    // Per Sample vcf (but jointly genotyped)
-     ch_select_variants = GenotypeGVCFs.out.vcf_GenotypeGVCFs
-    .flatMap{ caller, li_patient_sample_id_map, interval_bed,  vcf, vcf_idx ->
-        per_sample_list=[]
-        li_patient_sample_id_map.each { entry ->
-            per_sample_list.add([caller, entry.idPatient, entry.idSample, interval_bed, vcf, vcf_idx])
-        }
-        per_sample_list
-    }
-    // .flatten()
-    // .dump(tag: 'ch_select_variants')
-
+    _ch_select_variant_input = CohortConcatVCF.out[0].combine(_sample_ids)
     SelectVariants(
-        ch_select_variants,
+        _ch_select_variant_input,
         _fasta,
         _fasta_fai,
         _dict
     )
+
+    // // Per Sample vcf (but jointly genotyped)
+    //  ch_select_variants = GenotypeGVCFs.out.vcf_GenotypeGVCFs
+    // .flatMap{ caller, li_patient_sample_id_map, interval_bed,  vcf, vcf_idx ->
+    //     per_sample_list=[]
+    //     li_patient_sample_id_map.each { entry ->
+    //         per_sample_list.add([caller, entry.idPatient, entry.idSample, interval_bed, vcf, vcf_idx])
+    //     }
+    //     per_sample_list
+    // }
+    // .flatten()
+    // .dump(tag: 'ch_select_variants')
+
+    // SelectVariants(
+    //     ch_select_variants,
+    //     _fasta,
+    //     _fasta_fai,
+    //     _dict
+    // )
     // SelectVariants output
     //tuple val("HaplotypeCaller_Jointly_Genotyped"), id_patient, id_sample, file("vcf")
-    vcf_ConcatenateVCFs = SelectVariants.out.vcf_SelectVariants.groupTuple(by:[0, 1, 2])
+    // vcf_ConcatenateVCFs = SelectVariants.out.vcf_SelectVariants.groupTuple(by:[0, 1, 2])
     // Now add the individually called vcfs too
     // vcf_ConcatenateVCFs = vcf_ConcatenateVCFs.mix(vcf_HaplotypeCaller)
     // if (!params.no_gvcf){ // if user specified, noGVCF, skip saving the GVCFs from HaplotypeCaller
@@ -86,83 +93,72 @@ workflow wf_jointly_genotype_gvcf{
     // }
     // vcf_ConcatenateVCFs.dump('concat_vcf: ')
 
-    ConcatVCF(
-        vcf_ConcatenateVCFs,
-        _fasta_fai,
-        _target_bed,
-        'HC_jointly_genotyped', // prefix for output files
-        'vcf', // extension for the output files
-        'HC_jointly_genotyped_gvcf' // output directory name
-        )
+    // ConcatVCF(
+    //     vcf_ConcatenateVCFs,
+    //     _fasta_fai,
+    //     _target_bed,
+    //     'HC_jointly_genotyped', // prefix for output files
+    //     'vcf', // extension for the output files
+    //     'HC_jointly_genotyped_gvcf' // output directory name
+    //     )
     
-    // Create a channel to hold GIAB samples for validation using hap.py
-    // hc_jointly_genotyped_vcfs = ConcatVCF.out.concatenated_vcf_with_index
-    //                       .filter{  "${it[0]}" == 'HaplotypeCaller_Jointly_Genotyped'}
-    //                     //   .dump(tag: 'hc_jointly_genotyped_vcfs')
 
-    emit:
-    vcfs_with_indexes = ConcatVCF.out.concatenated_vcf_with_index
-    vcfs_without_indexes = ConcatVCF.out.concatenated_vcf_without_index
+    //emit:
+    // vcfs_with_indexes = ConcatVCF.out.concatenated_vcf_with_index
+    // vcfs_without_indexes = ConcatVCF.out.concatenated_vcf_without_index
     // cohort_vcf_with_index = CohortConcatVCF.out.cohort_vcf_with_index
     // cohort_vcf_without_index = CohortConcatVCF.out[1]
 } // end of wf_haplotypecaller
 
-process GenomicsDBImport {
-    label 'container_llab'
-    label 'cpus_16'
-    // echo true
-    tag{interval_name}
-    // publishDir "${OUT_DIR}/misc/genomicsdb/", mode: 'copy', overwrite: false
-
-    input:
-    // tuple val(interval_name), file(interval_bed), val(list_id_patient), val(list_id_sample), file(gvcfs)
-    tuple val(interval_name), file(interval_bed), val(patientSampleIdMap), file(gvcfs)
-    
-    output:
-    tuple val(interval_name), file(interval_bed), val(patientSampleIdMap), file ("${interval_name}.gdb")
-
-    when: 'haplotypecaller' in tools
-
-    script:
-    sample_map="cohort_samples.map"
-    interval_name_with_underscore="${interval_name}_"
-    // gDB = chr
-    """
-    init.sh
-    for x in *.g.vcf
-    do
-        bgzip \$x
-        tabix \${x}.gz
-    done
-
-    for x in *.g.vcf.gz
-    do
-        
-        base_name=`basename \$x .g.vcf.gz`
-        sample=\${base_name#$interval_name_with_underscore}
-        echo "\${sample}\t\${x}" >> ${sample_map}
-    done
-    
-    gatk --java-options -Xmx${task.memory.toGiga()}g \
-    GenomicsDBImport \
-    --genomicsdb-workspace-path ${interval_name}.gdb \
-    -L $interval_bed \
-    --sample-name-map ${sample_map} \
-    --reader-threads ${task.cpus}
-
-    """
-}
 
 // STEP GATK HAPLOTYPECALLER.2
 
+// Convert per sample gvcfs collected into a multi-sample gvcf
 
-process GenotypeGVCFs {
+
+
+process CombineGVCFs {
     label 'container_llab'
-    label 'cpus_8'
-    tag {interval_bed.baseName}
+    label 'cpus_32'
+    publishDir "${params.outdir}/VariantCalling/CombinedGVCF", mode: params.publish_dir_mode
     input:
         // tuple val(interval_name), file(interval_bed), val(list_id_patient), val(list_id_sample), file(gdb)
-        tuple val(interval_name), file(interval_bed), val(patientSampleIdMap), file(gdb)
+        file(gvcfs)
+        file(tbis)
+        file(fasta)
+        file(fastaFai)
+        file(dict)
+
+    output:
+       tuple file('cohort.g.vcf.gz'), file('cohort.g.vcf.gz.tbi')
+    //    file('cohort.g.vcf.gz.tbi')
+    
+    when: 'joint_genotype' in tools
+
+    script:
+    vcfs_str = ''
+    gvcfs.each{vcfs_str += "--variant ${it} "}
+
+    """
+    init.sh
+    gatk --java-options -Xmx${task.memory.toGiga()}g \
+        CombineGVCFs \
+        -R ${fasta} \
+        ${vcfs_str} \
+        --create-output-variant-index \
+        -O cohort.g.vcf.gz
+    """
+}
+
+process GenotypeGVCFs {
+    echo true
+    label 'container_llab'
+    label 'cpus_16'
+    tag {intervalBed.baseName}
+    input:
+        // tuple val(interval_name), file(interval_bed), val(list_id_patient), val(list_id_sample), file(gdb)
+        // tuple val(interval_name), file(interval_bed), val(patientSampleIdMap), file(gdb)
+        tuple file(cohort_gvcf), file(tbi), file(intervalBed)
         file(fasta)
         file(fastaFai)
         file(dict)
@@ -170,60 +166,34 @@ process GenotypeGVCFs {
         file(dbsnpIndex)
 
     output:
-    // tuple val("HaplotypeCaller"), list_id_patient, list_id_sample, file("${interval_name}.vcf"), file("${interval_name}.vcf.idx"), emit: vcf_GenotypeGVCFs
-    tuple val("HaplotypeCaller"),  val(patientSampleIdMap), file(interval_bed), file("${interval_name}.vcf"), file("${interval_name}.vcf.idx"), emit: vcf_GenotypeGVCFs
-    // tuple val("HaplotypeCaller_Jointly_Genotyped"), val(interval_name), file(interval_bed), val(list_id_patient), val(list_id_sample), file ("${interval_name}.vcf"), file ("${interval_name}.vcf.idx"), emit: vcf_GenotypeGVCFs
-    
-    when: 'haplotypecaller' in tools
+    file("${out_file_bn}.vcf") 
+    file("${out_file_bn}.vcf.idx")
+
+    when: 'joint_genotype' in tools
 
     script:
+    out_file_bn = intervalBed.baseName 
     // Using -L is important for speed and we have to index the interval files also
     """
     init.sh
+    echo "cohort_gvcf: ${cohort_gvcf}"
+    echo "tbi: ${tbi}"
+    echo "intervalBed: ${intervalBed}"
+    echo "fasta: ${fasta}"
+    echo "fastaFai: ${fastaFai}"
+    echo "dict: ${dict}"
+    echo "dbsnp: ${dbsnp}"
+    echo "dbsnpIndex: ${dbsnpIndex}"
     gatk --java-options -Xmx${task.memory.toGiga()}g \
         GenotypeGVCFs \
         -R ${fasta} \
-        -L ${interval_bed} \
+        -L ${intervalBed} \
         -D ${dbsnp} \
-        -V gendb://${gdb} \
+        -V ${cohort_gvcf} \
         --create-output-variant-index \
-        -O "${interval_name}.vcf"
+        -O "${out_file_bn}.vcf"
     """
 }
-
-process SelectVariants {
-    label 'container_llab'
-    label 'cpus_8'
-    tag {interval_bed.baseName}
-    input:
-        // tuple val(caller), val(id_patient), val(id_sample), val(interval_name), file(interval_bed), file (vcf), file (vcf_idx)
-        tuple val(caller), val(id_patient), val(id_sample), file(interval_bed), file (vcf), file (vcf_idx)
-        file(fasta)
-        file(fastaFai)
-        file(dict)
-
-    output:
-    // tuple val("HaplotypeCaller"), idPatient, idSample, file("${intervalBed.baseName}_${idSample}.vcf"), emit: vcf_GenotypeGVCFs
-    // tuple val("HaplotypeCaller"), val(interval_name), file(interval_bed), val(list_id_patient), val(list_id_sample), file ("${interval_name}.vcf"), file ("${interval_name}.vcf.idx"), emit: vcf_GenotypeGVCFs
-    tuple val("HaplotypeCaller_Jointly_Genotyped"), id_patient, id_sample, file("${interval_bed.baseName}_${id_sample}.vcf"), emit: vcf_SelectVariants
-    
-    when: 'haplotypecaller' in tools
-
-    script:
-    // Using -L is important for speed and we have to index the interval files also
-    """
-    init.sh
-    gatk --java-options -Xmx${task.memory.toGiga()}g \
-            SelectVariants \
-            -R ${fasta} \
-            -L ${interval_bed} \
-            -V ${vcf} \
-            -O ${interval_bed.baseName}_${id_sample}.vcf \
-            -sn ${id_sample}
-    """
-}
-
-
 
 process CohortConcatVCF {
     label 'container_llab'
@@ -234,19 +204,19 @@ process CohortConcatVCF {
     publishDir "${params.outdir}/VariantCalling/HC_cohort_vcf", mode: params.publish_dir_mode
 
     input:
-        file(vcFiles)
+        file(vcfs)
+        file(tbis)
         file(fastaFai)
         file(targetBED)
 
     output:
-    // we have this funny *_* pattern to avoid copying the raw calls to publishdir
         tuple file("HC_cohort.vcf.gz"), file("HC_cohort.vcf.gz.tbi"), emit: cohort_vcf_with_index
-        // tuple file("HC_cohort.vcf.gz"), emit: cohort_vcf_without_index
         file("HC_cohort.vcf.gz")
-        // file("HC_cohort.vcf.gz"), file("HC_cohort.vcf.gz.tbi"), emit: cohortvcfwithindex
-        // file("HC_cohort.vcf.gz"), emit: cohortvcfwithoutindex
 
-    when: ('haplotypecaller' in tools || 'mutect2' in tools || 'freebayes' in tools)
+    when: ('haplotypecaller' in tools ||
+           'mutect2' in tools || 
+           'freebayes' in tools ||
+           'joint_genotype' in tools )
 
     script:
     options = params.target_bed ? "-t ${targetBED}" : ""
@@ -255,4 +225,46 @@ process CohortConcatVCF {
     concatenateVCFs.sh -i ${fastaFai} -c ${task.cpus} -o HC_cohort.vcf ${options}
     """
 }
+
+
+process SelectVariants {
+    // echo true
+    label 'container_llab'
+    label 'cpus_4'
+    tag {idSample}
+    
+    publishDir "${params.outdir}/VariantCalling/${idSample}/HC_jointly_genotyped_vcf", mode: params.publish_dir_mode
+    input:
+        // tuple val(caller), val(id_patient), val(id_sample), val(interval_name), file(interval_bed), file (vcf), file (vcf_idx)
+        tuple file (cohort_vcf), file (tbi), idSample
+        file(fasta)
+        file(fastaFai)
+        file(dict)
+
+    output:
+    // tuple val("HaplotypeCaller_Jointly_Genotyped"), id_patient, id_sample, file("${interval_bed.baseName}_${id_sample}.vcf"), emit: vcf_SelectVariants
+    tuple file("${idSample}.vcf.gz"), file("${idSample}.vcf.gz.tbi")
+    when: ('joint_genotype' in tools )
+
+    script:
+    // samples_str = ''
+    // sample_ids.each{samples_str+= "${it} "}
+    // Using -L is important for speed and we have to index the interval files also
+    """
+    init.sh
+    gatk --java-options -Xmx${task.memory.toGiga()}g \
+            SelectVariants \
+            -R ${fasta} \
+            -V ${cohort_vcf} \
+            -O ${idSample}.vcf.gz \
+            -sn ${idSample} \
+            --create-output-variant-index
+    
+    """
+}
+
+
+
+
+
 

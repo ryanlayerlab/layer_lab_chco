@@ -49,7 +49,7 @@ process ConcatVCF {
             emit: concatenated_vcf_without_index
             
     script:
-    outFile =  "${output_file_prefix}_${idSample}.${output_file_ext}"
+    outFile =  "${output_file_prefix}${idSample}.${output_file_ext}"
     options = params.target_bed ? "-t ${targetBED}" : ""
     """
     init.sh
@@ -386,6 +386,7 @@ def defineStepList() {
         'markdups',
         'recalibrate',
         'variantcalling',
+        'joint_genotype',
         'annotate'
     ]
 }
@@ -399,6 +400,7 @@ def defineToolList() {
         'dnaseq',
         'freebayes',
         'haplotypecaller',
+        'joint_genotype',
         'deepvariant',
         // 'benchmark_dv_and_hc_against_giab',
         // 'benchmark_dv_against_hc',
@@ -635,6 +637,34 @@ def extractDupMarked(tsvFile) {
 
         // infos.add([idPatient, gender, status, idSample, bamFile, baiFile, recalTable])
         infos.add([idPatient, gender, status, idSample, bamFile, baiFile])
+    }
+    return Channel.from(infos)
+}
+
+def extractGvcfs(tsvFile) {
+    def infos = []
+
+    def allLines = tsvFile.readLines()
+    for (line in allLines){
+        // info("Parsing Line: ${line}")
+        def trimmed = line.trim()
+        def cols = trimmed.split()
+        checkNumberOfItem(cols, 6)
+
+        def idPatient  = cols[0]
+        def gender     = cols[1]
+        def status     = returnStatus(cols[2].toInteger())
+        def idSample   = cols[3]
+        def gvcfFile   = returnFile(cols[4])
+        def tbiFile   = returnFile(cols[5])
+        // def recalTable = returnFile(row[6])
+
+            if (!hasExtension(gvcfFile, "gz")) exit 1, "File: ${gvcfFile} has the wrong extension. See --help for more information"
+            if (!hasExtension(tbiFile, "tbi")) exit 1, "File: ${tbiFile} has the wrong extension. See --help for more information"
+            // if (!hasExtension(recalTable, "recal.table")) exit 1, "File: ${recalTable} has the wrong extension. See --help for more information"            
+
+        // infos.add([idPatient, gender, status, idSample, bamFile, baiFile, recalTable])
+        infos.add([idPatient, gender, status, idSample, gvcfFile, tbiFile])
     }
     return Channel.from(infos)
 }

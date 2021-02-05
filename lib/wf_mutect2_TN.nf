@@ -36,7 +36,7 @@ workflow wf_mutect2_TN{
             _concat_vcf,
             _fasta_fai,
             _target_bed,
-            'mutect2_TN_unfiltered', // prefix for output files
+            'mutect2_TN_unfiltered_', // prefix for output files
             'vcf', // extension for the output files
             'Mutect2_unfiltered' // output directory name
             )

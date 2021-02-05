@@ -26,7 +26,7 @@ workflow wf_individually_genotype_gvcf{
             .map{ idPatient, idSample, vcfs -> 
                 ['HaplotypeCaller_Individually_Genotyped', idPatient, idSample, vcfs]
             }
-            .dump(tag: "vcf_ConcatVcf")
+            // .dump(tag: "vcf_ConcatVcf")
 
         ConcatVCF(
                 _vcf_concatVCF,
