@@ -220,6 +220,10 @@ ch_giab_highconf_tbi = params.giab_highconf_tbi ? Channel.value(file(params.giab
 ch_giab_highconf_regions = params.giab_highconf_regions ? Channel.value(file(params.giab_highconf_regions)) : "null"
 ch_chco_highqual_snps = params.chco_highqual_snps ? Channel.value(file(params.chco_highqual_snps)) : "null"
 
+// Parameters needed for QC
+qc_finger_print_sites = params.finger_print_sites ? Channel.value(file(params.finger_print_sites)) : "null"
+qc_extra_finger_print_sites = params.extra_finger_print_sites ? Channel.value(file(params.extra_finger_print_sites)) : "null"
+
 /* Create channels for various indices. These channels are either filled by the user parameters or 
 form inside the build_indices workflow */
 ch_fasta_fai = ch_fasta_gz = ch_fasta_gzi = ch_fasta_gz_fai \
@@ -254,7 +258,8 @@ include {wf_manta_single} from './lib/wf_manta_single'
 include {wf_vcf_stats} from './lib/wf_vcf_stats' 
 include {wf_multiqc} from './lib/wf_multiqc' 
 include {ConcatVCF} from './lib/wf_haplotypecaller'
-
+include {wf_alamut} from './lib/alamut'
+include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites} from './lib/quality_control'
 
 workflow{
 
@@ -367,6 +372,14 @@ workflow{
             ch_fasta_fai,         
             ch_dict
             )
+
+    // QC stats that go into final QC excel report
+    exonCoverage(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed,"recal")
+    onTarget(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_padded_target_bed)
+    wf_raw_bam_exonCoverage(ch_bam_mapped,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
+    insertSize(ch_bam_recal)
+    wf_qc_fingerprinting_sites(ch_bam_recal,qc_extra_finger_print_sites)
+    dnaFingerprint(ch_bam_recal,qc_finger_print_sites,"Normal")
 
 /* At this point we have the following bams:
 a) raw unmarked bams
@@ -598,6 +611,8 @@ c) recalibrated bams
         wf_vcf_stats.out.vcfootls_stats
     )
 
+    wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
+    collectQC(file(tsv_path), params.outdir,exonCoverage.out,wf_raw_bam_exonCoverage.out,insertSize.out,dnaFingerprint.out,wf_vcf_stats.out.bcfootls_stats,wf_alamut.out)
 } // end of workflow
 
 
