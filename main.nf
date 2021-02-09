@@ -11,7 +11,8 @@ include {helpMessage;printSummary;
         extractUnmarked; extractDupMarked;
         flowcellLaneFromFastq; hasExtension;
         returnFile; reduceVCF;
-        returnStatus; getVCFsToAnnotate
+        returnStatus; getVCFsToAnnotate;
+        extractGvcfs
         } from './lib/utility' 
 
 if (params.help) exit 0, helpMessage()
@@ -43,7 +44,7 @@ stepList = defineStepList()
 step = params.step ? params.step.toLowerCase() : ''
 
 if (step.contains(',')) exit 1, 'You can choose only one step, see --help for more information'
-if (!checkParameterExistence(step, stepList)) exit 1, "Unknown step ${step}, see --help for more information"
+if (!checkParameterExistence(step, stepList)) exit 1, "Unknown step specified: ${step} [valid steps: ${stepList}], see --help for more information"
 
 toolList = defineToolList()
 tools = params.tools ? params.tools.split(',').collect{it.trim().toLowerCase()} : []
@@ -84,6 +85,7 @@ if (tsv_path) {
         case 'markdups': ch_input_sample = extractUnmarked(tsvFile); break
         case 'recalibrate': ch_input_sample = extractDupMarked(tsvFile); break
         case 'variantcalling': ch_input_sample = extractBam(tsvFile); break
+        case 'joint_genotype': ch_input_sample = extractGvcfs(tsvFile); break
         case 'annotate': break
         default: exit 1, "Unknown step ${step}"
     }
@@ -140,7 +142,7 @@ params.bwa_index = params.genome && params.fasta && 'mapping' in step ? params.g
 params.chr_dir = params.genome && 'controlfreec' in tools ? params.genomes[params.genome].chr_dir ?: null : null
 params.chr_length = params.genome && 'controlfreec' in tools ? params.genomes[params.genome].chr_length ?: null : null
 params.dbsnp = params.genome && \
-                ('mapping' in step || 'markdups' in step || 'controlfreec' in tools || 'haplotypecaller' in tools || 'mutect2' in tools) \
+                ('mapping' in step || 'markdups' in step || 'controlfreec' in tools || 'haplotypecaller' in tools || 'joint_genotype' in tools || 'mutect2' in tools) \
                 ? params.genomes[params.genome].dbsnp ?: null : null
 
 params.dbsnp_index = params.genome && params.dbsnp ? params.genomes[params.genome].dbsnp_index ?: null : null
@@ -164,7 +166,8 @@ ch_acLoci = params.ac_loci && 'ascat' in tools ? Channel.value(file(params.ac_lo
 ch_acLoci_GC = params.ac_loci_GC && 'ascat' in tools ? Channel.value(file(params.ac_loci_GC)) : "null"
 ch_chrDir = params.chr_dir && 'controlfreec' in tools ? Channel.value(file(params.chr_dir)) : "null"
 ch_chrLength = params.chr_length && 'controlfreec' in tools ? Channel.value(file(params.chr_length)) : "null"
-ch_dbsnp = params.dbsnp && ('mapping' in step || 'controlfreec' in tools || 'haplotypecaller' in tools || 'mutect2' in tools) ? Channel.value(file(params.dbsnp)) : "null"
+dbsnp_check = ('mapping' in step || 'joint_genotype' in step || 'controlfreec' in tools || 'haplotypecaller' in tools|| 'joint_genotype' in tools || 'mutect2' in tools)
+ch_dbsnp = params.dbsnp &&  dbsnp_check ? Channel.value(file(params.dbsnp)) : "null"
 // ch_dbsnp_index = params.dbsnp_index && ('mapping' in step || 'controlfreec' in tools || 'haplotypecaller' in tools || 'mutect2' in tools) ? Channel.value(file(params.dbsnp_index)) : "null"
 ch_fasta = params.fasta && !('annotate' in step) ? Channel.value(file(params.fasta)) : "null"
 // ch_dict = params.dict ? Channel.value(file(params.dict)) : "null"
@@ -339,7 +342,7 @@ workflow{
     ch_bam_marked = Channel.empty()
     
     ch_bam_marked = Channel.empty()
-    if (!(step in ['recalibrate', 'variantcalling', 'annotate'])){
+    if (!(step in ['recalibrate', 'variantcalling', 'joint_genotype', 'annotate'])){
             wf_mark_duplicates(ch_bam_mapped)
             ch_bam_marked = wf_mark_duplicates.out.dm_bams
     }
@@ -407,7 +410,7 @@ c) recalibrated bams
     )
 
     ch_bam_for_vc = Channel.empty()
-    if (step == 'variantcalling'){
+    if ((step == 'variantcalling') || (step ==  'joint_genotype') ){
        ch_bam_for_vc = ch_input_sample 
     } else{
         ch_bam_for_vc = ch_bam_recal
@@ -494,26 +497,11 @@ c) recalibrated bams
         ch_fasta,
         ch_fasta_fai,         
         ch_dict,
+        ch_target_bed,
         ch_dbsnp,
         ch_dbsnp_index
     )
-    // Create individual gvcfs without any genotyping
-     gvcf_ConcatVCF = 
-            wf_haplotypecaller.out.gvcf_GenotypeGVCFs
-            .groupTuple(by: [0,1])
-            .map{ idPatient, idSample, interval_beds,  gvcfs -> 
-                ['HaplotypeCaller_gvcf', idPatient, idSample, gvcfs]
-            }
-            // .dump(tag: "gvcfs_ConcatVcf")
-
-    ConcatVCF(
-                gvcf_ConcatVCF,
-                ch_fasta_fai,
-                ch_target_bed,
-                'HC', // prefix for output files
-                'g.vcf', // extension for the output files
-                'HC_individually_genotyped_gvcf' // output directory name
-                )
+   
 
     // individually genotype gvcfs
     wf_individually_genotype_gvcf(
@@ -525,12 +513,44 @@ c) recalibrated bams
         ch_dbsnp_index,
         ch_target_bed
     )
+// Check per sample gvcfs and prepare an input for the joint genotyping step
+// If 'haplotypecaller' was specified as one of the tools, get its output and use that
+// as an input; otherwise extract gvcfs from the input samples.tsv
+    ch_gvcfs_for_joint_genotyping = Channel.empty()
+    if ('haplotypecaller' in tools && 'joint_genotype' in tools){
+        ch_gvcfs_for_joint_genotyping = wf_haplotypecaller.out.gvcf_per_sample
+    }else if (step == 'joint_genotype' && 'joint_genotype' in tools) {
+        ch_gvcfs_for_joint_genotyping = ch_input_sample
+                                        .map{idP, idS, gvcf, tbi ->
+                                            ['HaplotypeCallerGVCF', idP,idS,gvcf,tbi]
+                                            }
+    }
 
+    // ch_gvcfs_for_joint_genotyping.dump(tag: 'ch_gvcfs_for_joint_genotyping')
+    // Now gather all gvcfs for input to jointly_genotype_gvcf
+    ch_sample_ids = ch_gvcfs_for_joint_genotyping
+                    .map{vc, idP, idS, gvcf,tbi ->
+                        [idS]
+                        }
+                        
+    ch_gvcfs = ch_gvcfs_for_joint_genotyping.map{vc, idP, idS, gvcf,tbi ->
+                        gvcf
+                        }
+                        .collect()
+    
+    ch_tbis = ch_gvcfs_for_joint_genotyping.map{vc, idP, idS, gvcf,tbi ->
+                        tbi
+                        }
+                        .collect()
+    
     wf_jointly_genotype_gvcf(
-        wf_haplotypecaller.out.gvcf_GenotypeGVCFs,
-        ch_target_bed,
-         ch_fasta,
+        ch_sample_ids,
+        ch_gvcfs,
+        ch_tbis,       
+        ch_fasta,
         ch_fasta_fai,         
+        ch_bed_intervals,
+        ch_target_bed,
         ch_dict,
         ch_dbsnp,
         ch_dbsnp_index
@@ -595,8 +615,11 @@ c) recalibrated bams
     //     ch_fasta_fai
     //     )
 
+    // wf_vcf_stats(wf_deepvariant.out.vcf,
+    //     wf_jointly_genotype_gvcf.out.vcfs_with_indexes
+    //     )
     wf_vcf_stats(wf_deepvariant.out.vcf,
-        wf_jointly_genotype_gvcf.out.vcfs_with_indexes
+        Channel.empty()
         )
 
     wf_multiqc(
