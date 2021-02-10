@@ -69,7 +69,7 @@ for subject in samples.subject.unique():
     for sample in current_subject_df['sample'].unique().tolist():
         if samples.loc[(samples['subject'] == subject) & (samples['sample'] == sample),'status'].values[0] in [0,1]:
             """ Fingerprints """
-            fp = pd.read_csv(res_dir + '/QC/{}/FingerPrinting/{}_DNA_Fingerprint.txt'.format(sample,sample))
+            fp = pd.read_csv(res_dir + '/QC/{}/FingerPrinting/Normal/{}_DNA_Fingerprint.txt'.format(sample,sample))
             fp.Fingerprint = ''.join(fp.Fingerprint.astype(str).str.split('.').str[0])
             if fp.iloc[-1].DP < 10000:
                 fp.Fingerprint = fp.Fingerprint.values[0][:-3] + '_00'
@@ -82,7 +82,7 @@ for subject in samples.subject.unique():
             fp['SNP'] = fp['Chromo'].astype(str) + ':' + fp['Start_Pos'].astype(str) + \
             ':' + fp['End_Pos'].astype(str) + ':' + fp['Minor'] + ':' + fp['Major']
             fp = fp.groupby(['Specimen ID','Micronic ID','Fingerprint','SNP'],sort=False).AF.sum().unstack().reset_index()
-            fingerprints = fingerprints.append(fp[[col for col in fp.columns if not col.startswith('Y:')]],ignore_index=True)
+            fingerprints = fingerprints.append(fp[[col for col in fp.columns if not col.startswith('Y:')]],ignore_index=True,sort=False)
             """ Picard Metrics """
             raw = pd.read_csv(res_dir + '/QC/{}/exonCoverage/{}.raw.hs_metrics.txt'.format(sample,sample),delimiter='\t',skiprows=6,nrows=1)
             insert = pd.read_csv(res_dir + '/QC/{}/insertSize/{}_insert_size_metrics.txt'.format(sample,sample),delimiter='\t',skiprows=6,nrows=1)
@@ -113,12 +113,12 @@ for subject in samples.subject.unique():
             '% Dups':(raw.TOTAL_READS.values - raw.PF_UNIQUE_READS.values)/raw.TOTAL_READS.values,\
             'Insert Size Mean':insert.MEAN_INSERT_SIZE.values,\
             'Insert Size SD':insert.STANDARD_DEVIATION.values,\
-            '%10x':final.PCT_TARGET_BASES_10X.values,\
+            '%20x':final.PCT_TARGET_BASES_20X.values,\
             '%50x':final.PCT_TARGET_BASES_50X.values,\
             '%100x':final.PCT_TARGET_BASES_100X.values,\
             'Low Coverage Exons':[exons.loc[exons.pct_low_cov > 0.1].shape[0]],\
             'Number of Records':bcftools.loc[bcftools['[3]key'] == 'number of records:','[4]value'].values,\
-            'Number of SNPs':bcftools.loc[bcftools['[3]key'] == 'number of SNPs:','[4]value'].values}),ignore_index=True)
+            'Number of SNPs':bcftools.loc[bcftools['[3]key'] == 'number of SNPs:','[4]value'].values}),ignore_index=True,sort=False)
         elif samples.loc[(samples['subject'] == subject) & (samples['sample'] == sample),'status'].values[0] == 2:
             print('Warning in collectQC.py: this section of the script should not be running at rna_seq is not part of this pipeline')
             """ Picard Metrics """
@@ -137,7 +137,7 @@ for subject in samples.subject.unique():
             '% mRNA Bases':rnaseq.PCT_MRNA_BASES.values,\
             '% Dups':[1 - float(star['Uniquely mapped reads %'][:-1])/100],\
             'Insert Size Mean':insert.MEAN_INSERT_SIZE.values,\
-            'Insert Size SD':insert.STANDARD_DEVIATION.values}),ignore_index=True)
+            'Insert Size SD':insert.STANDARD_DEVIATION.values}),ignore_index=True,sort=False)
 
 writer = pd.ExcelWriter('QC_Stats.xlsx',engine='xlsxwriter')
 if dna_qc.shape[0] > 0:

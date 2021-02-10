@@ -37,7 +37,7 @@ process exonCoverage{
     --PER_BASE_COVERAGE ${bam.baseName}.per_base_coverage.txt \
     -R ${fasta}
 
-    python /scratch/Shares/layer/workspace/michael_sandbox/QC_pipeline/bin/exonCoverage.py target.interval_list ${bam.baseName}.per_base_coverage.txt ${bam.baseName}_per_exon_coverage.txt
+    exonCoverage.py target.interval_list ${bam.baseName}.per_base_coverage.txt ${bam.baseName}_per_exon_coverage.txt
     """
 }
 
