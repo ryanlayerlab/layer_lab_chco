@@ -25,6 +25,7 @@ process IndexBamFile {
 
 process ConcatVCF {
     label 'cpus_8'
+    label 'container_llab'
 
     tag {variantCaller + "-" + idSample}
 

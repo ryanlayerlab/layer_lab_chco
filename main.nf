@@ -379,7 +379,7 @@ workflow{
     // QC stats that go into final QC excel report
     exonCoverage(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed,"recal")
     onTarget(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_padded_target_bed)
-    wf_raw_bam_exonCoverage(ch_bam_mapped,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
+    wf_raw_bam_exonCoverage(ch_bam_mapped_raw,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
     insertSize(ch_bam_recal)
     wf_qc_fingerprinting_sites(ch_bam_recal,qc_extra_finger_print_sites)
     dnaFingerprint(ch_bam_recal,qc_finger_print_sites,"Normal")
@@ -619,7 +619,7 @@ c) recalibrated bams
     //     wf_jointly_genotype_gvcf.out.vcfs_with_indexes
     //     )
     wf_vcf_stats(wf_deepvariant.out.vcf,
-        Channel.empty()
+        wf_haplotypecaller.out.gvcf_per_sample
         )
 
     wf_multiqc(
@@ -633,8 +633,9 @@ c) recalibrated bams
         wf_vcf_stats.out.bcfootls_stats,
         wf_vcf_stats.out.vcfootls_stats
     )
-
-    wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
+    wf_alamut(wf_haplotypecaller.out.gvcf_per_sample)
+    // wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
+    // wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
     collectQC(file(tsv_path), params.outdir,exonCoverage.out,wf_raw_bam_exonCoverage.out,insertSize.out,dnaFingerprint.out,wf_vcf_stats.out.bcfootls_stats,wf_alamut.out)
 } // end of workflow
 
