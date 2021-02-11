@@ -4,6 +4,7 @@ status_map = params.globals.status_map
 gender_map = params.globals.gender_map
 // include {hasExtension} from './utility'
 include {IndexBamFile} from './utility'
+include {MarkDuplicates} from './wf_mark_duplicates'
 workflow wf_gather_mapped_partial_reads{
     take: _partial_mapped_reads
     take: _fasta
@@ -25,6 +26,7 @@ workflow wf_gather_mapped_partial_reads{
         // Now merge the grouped bams back to a single bam per sample
         MergeBamMapped(_bams_for_merge)
         IndexBamFile(MergeBamMapped.out)
+        
         // Creating a TSV file to restart from this step
         IndexBamFile.out
         .map { idPatient, idSample, bamFile, baiFile ->
