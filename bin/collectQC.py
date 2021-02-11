@@ -147,7 +147,7 @@ for subject in samples.subject.unique():
 writer = pd.ExcelWriter('QC_Stats.xlsx',engine='xlsxwriter')
 if dna_qc.shape[0] > 0:
     dna_qc = dna_qc[['Specimen ID', 'Micronic ID', 'Pass QC (Y/N)', 'Fingerprint', 'Total Reads', '% Quality', 'Mean Target Coverage', '% On Target', '% Dups', 'Insert Size Mean', 'Insert Size SD', '%20x', '%50x', '%100x', 'Low Coverage Exons', 'Number of Records', 'Number of SNPs']]
-    writer = excelAutofit(dna_qc,'DNA Overview',writer,pcts=['% Dups','%10x','%50x','%100x','% Quality','% On Target'])
+    writer = excelAutofit(dna_qc,'DNA Overview',writer,pcts=['% Dups','%20x','%50x','%100x','% Quality','% On Target'])
     writer.sheets['DNA Overview'].freeze_panes(1,2)
 if rna_qc.shape[0] > 0:
     writer = excelAutofit(rna_qc,'RNA Overview',writer,pcts=['% Aligned Bases','% mRNA Bases','% Dups'])
