@@ -1,4 +1,5 @@
 include {wf_gather_mapped_partial_reads} from './wf_gather_mapped_partial_reads'
+include {MarkDuplicates} from './wf_mark_duplicates'
 workflow wf_filter_and_gather_mapped_partial_reads{
     
     take:
@@ -148,6 +149,7 @@ process FilterOutSecondaryAndSupplementaryReads {
 
     output:
         tuple idPatient, idSample, idRun, file(out_bam),  emit: filtered_bam_mapped
+        // tuple idPatient, idSample, file(out_bam), file(out_bai),  emit: filtered_bam_mapped
 
     when: (params.filter_bams)
 
