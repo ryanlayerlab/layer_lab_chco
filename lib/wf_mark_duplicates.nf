@@ -1,10 +1,25 @@
-tools = params.globals.tools
 step = params.step
-
+tools = params.globals.tools
+status_map = params.globals.status_map
+gender_map = params.globals.gender_map
 workflow wf_mark_duplicates{
     take: _bams
     main:
-        MarkDuplicates(_bams)
+        MarkDuplicates(_bams,
+        'DuplicateMarked') // the output directory
+
+         MarkDuplicates.out
+        .map { idPatient, idSample, bamFile, baiFile ->
+            status = status_map[idPatient, idSample]
+            gender = gender_map[idPatient]
+            bam = "${params.outdir}/Preprocessing/${idSample}/DuplicateMarked/${idSample}.md.bam"
+            bai = "${params.outdir}/Preprocessing/${idSample}/DuplicateMarked/${idSample}.md.bai"
+            bam_file = file(bam)
+            bai_file = file(bai)
+            "${idPatient}\t${gender}\t${status}\t${idSample}\t${bam_file}\t${bai_file}\n"
+        }.collectFile(
+            name: "duplicate_marked_bams.tsv", sort: true, storeDir: "${params.outdir}/Preprocessing/TSV"
+        )
     emit:
         dm_bams = MarkDuplicates.out.marked_bams
         // dm_bam_only = MarkDuplicates.out.bam_only
@@ -17,18 +32,14 @@ process MarkDuplicates {
     label 'cpus_max'
     tag {idPatient + "-" + idSample}
 
-    publishDir "${params.outdir}/Preprocessing/${idSample}/DuplicateMarked/", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/Preprocessing/${idSample}/${output_dir}/", mode: params.publish_dir_mode
 
     input:
         tuple idPatient, idSample, file("${idSample}.bam"), file("${idSample}.bai")
+        val(output_dir)
 
     output:
         tuple idPatient, idSample, file("${idSample}.md.bam"), file("${idSample}.md.bai"), emit: marked_bams
-        // file("${idSample}.md.bam"), emit: bam_only
-        // file("${idSample}.md.bai"), emit: bai_only
-        // file ("${idSample}.bam.metrics")
-
-    // when: !(step in ['recalibrate', 'variantcalling', 'annotate'])
     when: step  ==  'mapping'
 
     script:

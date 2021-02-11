@@ -244,6 +244,7 @@ include {wf_gather_mapped_partial_reads} from './lib/wf_gather_mapped_partial_re
 include {wf_filter_and_gather_mapped_partial_reads} from './lib/wf_filter_and_gather_mapped_partial_reads' 
 include {wf_qc_bam_mapped} from './lib/wf_qc_bam_mapped' 
 include {wf_mark_duplicates} from './lib/wf_mark_duplicates' 
+include {wf_mark_duplicates_raw_bams} from './lib/wf_mark_duplicates_raw_bams.nf' 
 include {wf_somalier_extraction} from './lib/wf_somalier_extraction' 
 include {wf_recal_bam} from './lib/wf_recal_bam' 
 include {wf_qc_bam_recal} from './lib/wf_qc_bam_recal' 
@@ -322,7 +323,10 @@ workflow{
                                 ch_fasta_fai,
                                 ch_bwa_index,
                                 "_pq${params.bam_mapping_q}")
-            ch_bam_mapped_raw = ch_bam_mapped
+            // Since ch_bam_mapped (the raw bams) wont be used often for downstream analysis
+            // we keep them aside but only after duplcate marking
+            wf_mark_duplicates_raw_bams(ch_bam_mapped)
+            
             ch_bam_mapped = wf_filter_and_gather_mapped_partial_reads.out
         }
             
@@ -331,7 +335,8 @@ workflow{
 
     // If the pipeline is being started from the step 'markdups'
     // use bams from the provided tsv
-    if (step == 'markdups'){
+    if (step == 'markdups'){        
+
        ch_bam_mapped = ch_input_sample
     }
 
