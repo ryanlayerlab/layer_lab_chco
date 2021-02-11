@@ -18,10 +18,10 @@ process exonCoverage{
 
 
     output:
-    file("${idSample}.*")
+    path "${idSample}.*", emit: files
     file("target.interval_list")
 
-    when: !('exon_coverage' in skipQC) && params.bait_bed
+    when: ! ('chco_qc' in _skip_qc)  && params.bait_bed
 
     script:
     """
@@ -61,7 +61,7 @@ process onTarget{
     output:
     file("${bam.baseName}_on_target.txt")
 
-    when: !('on_target' in skipQC)
+    when: ! ('chco_qc' in _skip_qc)
 
     script:
     """
@@ -92,8 +92,8 @@ workflow wf_raw_bam_exonCoverage{
     main:
         exonCoverage(_bams,_fasta,_fasta_fai,_dict,_target,_bait,"raw")
 
-        //emit:
-        //raw_onTarget = exonCoverage.out
+    emit:
+        raw_onTarget = exonCoverage.out.files
 }
 
 workflow wf_qc_fingerprinting_sites{
@@ -103,6 +103,9 @@ workflow wf_qc_fingerprinting_sites{
 
     main:
          dnaFingerprint(_bam,_sites,"Extra")
+
+    emit:
+        fingerprint = dnaFingerprint.out
 }
 
 process insertSize{
@@ -120,7 +123,7 @@ process insertSize{
     file("${idSample}_insert_size_metrics.txt")
         file("${idSample}_insert_size_histogram.pdf")
 
-    when: !('insert_size' in skipQC)
+    when: ! ('chco_qc' in _skip_qc)
 
     script:
     """
@@ -147,7 +150,7 @@ process dnaFingerprint{
     output:
     file("${idSample}_DNA_Fingerprint.txt")
 
-    when: !('dnaFingerprint' in skipQC)
+    when: ! ('chco_qc' in _skip_qc)
 
     script:
     """
@@ -169,6 +172,8 @@ process collectQC{
     file(insertsize)
     file(fingerprint)
     file(bcf)
+
+    when: ! ('chco_qc' in _skip_qc)
 
     output:
     file("QC_Stats.xlsx")

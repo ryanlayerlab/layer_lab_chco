@@ -375,7 +375,8 @@ def defineSkipQClist() {
         'on_target_assessment',
         'sentieon',
         'vcftools',
-        'versions'
+        'versions',
+        'chco_qc'
     ]
 }
 
@@ -423,7 +424,8 @@ def defineToolList() {
         'strelka',
         'tiddit',
         'tnscope',
-        'vep'
+        'vep',
+        'alamut'
     ]
 }
 

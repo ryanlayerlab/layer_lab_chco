@@ -2,6 +2,8 @@ process alamut{
     label 'cpus_32'
     publishDir "${params.outdir}/Annotation/${idSample}/Alamut/", mode: params.publish_dir_mode
 
+    //when: 'alamut' in tools
+
     input:
     //tuple idPatient, idSample, file(vcfgz)
     tuple variantCaller, idPatient, idSample, file(vcfgz), file(vcfgzi)
@@ -26,5 +28,6 @@ workflow wf_alamut{
     
     main:
     alamut(_vcfgz)
+
 }
 
