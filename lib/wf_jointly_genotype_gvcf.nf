@@ -65,46 +65,8 @@ workflow wf_jointly_genotype_gvcf{
         _dict
     )
 
-    // // Per Sample vcf (but jointly genotyped)
-    //  ch_select_variants = GenotypeGVCFs.out.vcf_GenotypeGVCFs
-    // .flatMap{ caller, li_patient_sample_id_map, interval_bed,  vcf, vcf_idx ->
-    //     per_sample_list=[]
-    //     li_patient_sample_id_map.each { entry ->
-    //         per_sample_list.add([caller, entry.idPatient, entry.idSample, interval_bed, vcf, vcf_idx])
-    //     }
-    //     per_sample_list
-    // }
-    // .flatten()
-    // .dump(tag: 'ch_select_variants')
-
-    // SelectVariants(
-    //     ch_select_variants,
-    //     _fasta,
-    //     _fasta_fai,
-    //     _dict
-    // )
-    // SelectVariants output
-    //tuple val("HaplotypeCaller_Jointly_Genotyped"), id_patient, id_sample, file("vcf")
-    // vcf_ConcatenateVCFs = SelectVariants.out.vcf_SelectVariants.groupTuple(by:[0, 1, 2])
-    // Now add the individually called vcfs too
-    // vcf_ConcatenateVCFs = vcf_ConcatenateVCFs.mix(vcf_HaplotypeCaller)
-    // if (!params.no_gvcf){ // if user specified, noGVCF, skip saving the GVCFs from HaplotypeCaller
-    //     vcf_ConcatenateVCFs = vcf_ConcatenateVCFs.mix(gvcf_HaplotypeCaller)
-    // }
-    // vcf_ConcatenateVCFs.dump('concat_vcf: ')
-
-    // ConcatVCF(
-    //     vcf_ConcatenateVCFs,
-    //     _fasta_fai,
-    //     _target_bed,
-    //     'HC_jointly_genotyped', // prefix for output files
-    //     'vcf', // extension for the output files
-    //     'HC_jointly_genotyped_gvcf' // output directory name
-    //     )
-    
-
-    //emit:
-    // vcfs_with_indexes = ConcatVCF.out.concatenated_vcf_with_index
+    emit:
+    vcf_with_index = SelectVariants.out[0]
     // vcfs_without_indexes = ConcatVCF.out.concatenated_vcf_without_index
     // cohort_vcf_with_index = CohortConcatVCF.out.cohort_vcf_with_index
     // cohort_vcf_without_index = CohortConcatVCF.out[1]
@@ -243,6 +205,8 @@ process SelectVariants {
 
     output:
     // tuple val("HaplotypeCaller_Jointly_Genotyped"), id_patient, id_sample, file("${interval_bed.baseName}_${id_sample}.vcf"), emit: vcf_SelectVariants
+    
+    tuple val("HaplotypeCaller_Jointly_Genotyped"), idSample, file("${idSample}.vcf.gz"), file("${idSample}.vcf.gz.tbi")
     tuple file("${idSample}.vcf.gz"), file("${idSample}.vcf.gz.tbi")
     when: ('joint_genotype' in tools )
 
