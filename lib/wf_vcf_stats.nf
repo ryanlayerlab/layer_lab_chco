@@ -25,6 +25,7 @@ process BcftoolsStats {
     tag {"${variantCaller} - ${vcf}"}
 
     publishDir "${params.outdir}/Reports/${idSample}/BCFToolsStats/${variantCaller}", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/QC/${idSample}/BCFTools/${variantCaller}", mode: params.publish_dir_mode
 
     input:
         // tuple variantCaller, idSample, file(vcf)
@@ -51,6 +52,7 @@ process Vcftools {
     tag {"${variantCaller} - ${vcf}"}
 
     publishDir "${params.outdir}/Reports/${idSample}/VCFTools/${variantCaller}", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/QC/${idSample}/VCFTools/${variantCaller}", mode: params.publish_dir_mode
 
     input:
         tuple variantCaller, idPatient, idSample, file(vcf) , file(vcf_tbi)
@@ -63,6 +65,7 @@ process Vcftools {
     script:
     """
     init.sh
+
     vcftools \
     --gzvcf ${vcf} \
     --TsTv-by-count \

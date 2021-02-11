@@ -636,7 +636,7 @@ c) recalibrated bams
     wf_alamut(wf_haplotypecaller.out.gvcf_per_sample)
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
-    collectQC(file(tsv_path), params.outdir,exonCoverage.out,wf_raw_bam_exonCoverage.out,insertSize.out,dnaFingerprint.out,wf_vcf_stats.out.bcfootls_stats,wf_alamut.out)
+    collectQC(file(tsv_path), params.outdir,exonCoverage.out,wf_raw_bam_exonCoverage.out,insertSize.out,dnaFingerprint.out,wf_vcf_stats.out.bcfootls_stats.collect(),wf_alamut.out)
 } // end of workflow
 
 

@@ -5,7 +5,7 @@ import sys
 
 
 def exon_coverage(target_file, output_hs_metrics_file, output_file_name):
-    targets = pd.read_csv(target_file,delimiter='\t',comment='@',names=['chromo','start_pos','end_pos','target','gene','transcript','name'])
+    targets = pd.read_csv(target_file,delimiter='\t',comment='@',names=['chromo','start_pos','end_pos','strand','target','transcript','name'])
     targets['end_pos'] = targets['end_pos'].astype(int)
     targets['start_pos'] = targets['start_pos'].astype(int)
     targets['length'] = targets['end_pos'] - targets['start_pos']

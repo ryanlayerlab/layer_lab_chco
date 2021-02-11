@@ -93,7 +93,9 @@ for subject in samples.subject.unique():
             if samples.loc[(samples['subject'] == subject) & (samples['sample'] == sample),'status'].values[0] == 1:
                 """ BCFTools Metrics """
                 # get the first dir of a variant caller
-                filename = find_bcf_tools_stats_out(res_dir + '/QC/{}/VCFTools'.format(sample))
+                filename = find_bcf_tools_stats_out(res_dir + '/QC/{}/BCFTools'.format(sample))
+                print('-------')
+                print(filename)
                 bcftools = pd.read_csv(filename,delimiter='\t',skiprows=21,nrows=9)
                 """ Variant Duplicates """
                 #filename =
@@ -102,14 +104,17 @@ for subject in samples.subject.unique():
                 names=['CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT'])
                 variants = variants.append(vcf,ignore_index=True,sort=False)
             else:
+                print('ELSE')
                 bcftools = pd.DataFrame({'[3]key':['number of records:','number of SNPs:'],'[4]value':[None,None]})
             """ Appending relevant info to dataframe... """
+            print('blahhhhh')
+            print(bcftools.loc[bcftools['[3]key'] == 'number of records:','[4]value'].values)
             dna_qc = dna_qc.append(pd.DataFrame({'Specimen ID':[subject],\
             'Micronic ID':[sample.split('_')[0]],'Pass QC (Y/N)':'N',\
             'Fingerprint':fp.Fingerprint.values,'Total Reads':raw.TOTAL_READS.values,\
-            '% Quality':final.TOTAL_READS.values/raw.TOTAL_READS.values,\
+            '% Quality':float(final.TOTAL_READS.values)/raw.TOTAL_READS.values,\
             'Mean Target Coverage':final.MEAN_TARGET_COVERAGE.values,\
-            '% On Target':on_target.TOTAL_READS.values/raw.TOTAL_READS.values,\
+            '% On Target':float(on_target.TOTAL_READS.values)/raw.TOTAL_READS.values,\
             '% Dups':(raw.TOTAL_READS.values - raw.PF_UNIQUE_READS.values)/raw.TOTAL_READS.values,\
             'Insert Size Mean':insert.MEAN_INSERT_SIZE.values,\
             'Insert Size SD':insert.STANDARD_DEVIATION.values,\
@@ -117,7 +122,7 @@ for subject in samples.subject.unique():
             '%50x':final.PCT_TARGET_BASES_50X.values,\
             '%100x':final.PCT_TARGET_BASES_100X.values,\
             'Low Coverage Exons':[exons.loc[exons.pct_low_cov > 0.1].shape[0]],\
-            'Number of Records':bcftools.loc[bcftools['[3]key'] == 'number of records:','[4]value'].values,\
+            'Number of Records':bcftools.loc[bcftools['[3]key'] == 'number of records:','[4]value'].values[0],\
             'Number of SNPs':bcftools.loc[bcftools['[3]key'] == 'number of SNPs:','[4]value'].values}),ignore_index=True,sort=False)
         elif samples.loc[(samples['subject'] == subject) & (samples['sample'] == sample),'status'].values[0] == 2:
             print('Warning in collectQC.py: this section of the script should not be running at rna_seq is not part of this pipeline')
