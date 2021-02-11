@@ -262,8 +262,8 @@ include {wf_manta_single} from './lib/wf_manta_single'
 include {wf_vcf_stats} from './lib/wf_vcf_stats' 
 include {wf_multiqc} from './lib/wf_multiqc' 
 include {ConcatVCF} from './lib/wf_haplotypecaller'
-include {wf_alamut} from './lib/alamut'
-include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites} from './lib/quality_control'
+include {wf_alamut} from './lib/wf_alamut'
+include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites} from './lib/wf_quality_control'
 
 workflow{
 
