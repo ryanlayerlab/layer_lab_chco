@@ -620,12 +620,12 @@ c) recalibrated bams
     //     ch_fasta_fai
     //     )
 
-    // wf_vcf_stats(wf_deepvariant.out.vcf,
-    //     wf_jointly_genotype_gvcf.out.vcfs_with_indexes
-    //     )
+    //wf_vcf_stats(wf_deepvariant.out.vcf,
+    //    wf_jointly_genotype_gvcf.out.vcfs_with_indexes
+    //    )
     wf_vcf_stats(wf_deepvariant.out.vcf,
         wf_haplotypecaller.out.gvcf_per_sample
-        )
+       )
 
     wf_multiqc(
         wf_get_software_versions.out,
@@ -639,7 +639,7 @@ c) recalibrated bams
         wf_vcf_stats.out.vcfootls_stats
     )
     wf_alamut(wf_haplotypecaller.out.gvcf_per_sample)
-    // wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
+    //wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
     collectQC(file(tsv_path), params.outdir,exonCoverage.out.files.collect(),wf_raw_bam_exonCoverage.out.raw_onTarget.collect(),insertSize.out,dnaFingerprint.out.collect(),wf_vcf_stats.out.bcfootls_stats.collect(),wf_alamut.out)
 } // end of workflow
