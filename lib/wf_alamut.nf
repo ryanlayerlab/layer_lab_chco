@@ -7,6 +7,7 @@ process alamut{
     input:
     //tuple idPatient, idSample, file(vcfgz)
     tuple variantCaller, idPatient, idSample, file(vcfgz), file(vcfgzi)
+    //tuple val(variant_caller), val(idSample), file(vcf_gz), file(vcf_gz_tbi)
 
     output:
     file("${idSample}_alamut_annotation.tsv")
@@ -28,6 +29,9 @@ workflow wf_alamut{
     
     main:
     alamut(_vcfgz)
+
+    emit:
+    alamut_out = alamut.out[0]
 
 }
 

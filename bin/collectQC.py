@@ -90,25 +90,26 @@ for subject in samples.subject.unique():
             on_target = pd.read_csv(res_dir + '/QC/{}/onTarget/{}.recal_on_target.txt'.format(sample,sample),delimiter='\t',skiprows=6,nrows=1)
             """ Exon Coverage """
             exons = pd.read_csv(res_dir + '/QC/{}/exonCoverage/{}.recal_per_exon_coverage.txt'.format(sample,sample),delimiter='\t')
-            if samples.loc[(samples['subject'] == subject) & (samples['sample'] == sample),'status'].values[0] == 1:
-                """ BCFTools Metrics """
-                # get the first dir of a variant caller
-                filename = find_bcf_tools_stats_out(res_dir + '/QC/{}/BCFTools'.format(sample))
-                print('-------')
-                print(filename)
-                bcftools = pd.read_csv(filename,delimiter='\t',skiprows=21,nrows=9)
-                """ Variant Duplicates """
-                #filename =
-                vcf = pd.read_csv(res_dir + '/Annotation/{}/Alamut/{}_alamut_annotation.tsv'.format(sample,sample),\
-                delimiter='\t',comment='#',usecols=[ind for ind in range(9)],\
-                names=['CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT'])
-                variants = variants.append(vcf,ignore_index=True,sort=False)
-            else:
-                print('ELSE')
-                bcftools = pd.DataFrame({'[3]key':['number of records:','number of SNPs:'],'[4]value':[None,None]})
+            #if samples.loc[(samples['subject'] == subject) & (samples['sample'] == sample),'status'].values[0] == 1:
+            """ BCFTools Metrics """
+            # get the first dir of a variant caller
+            filename = find_bcf_tools_stats_out(res_dir + '/QC/{}/BCFTools'.format(sample))
+            print('-------')
+            print(filename)
+            bcftools = pd.read_csv(filename,delimiter='\t',skiprows=21,nrows=9)
+            """ Variant Duplicates """
+            #filename =
+            vcf = pd.read_csv(res_dir + '/Annotation/{}/Alamut/{}_alamut_annotation.tsv'.format(sample,sample),\
+            delimiter='\t',comment='#',usecols=[ind for ind in range(9)],\
+            names=['CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT'])
+            variants = variants.append(vcf,ignore_index=True,sort=False)
+            #else:
+            #    print('ELSE')
+            #    bcftools = pd.DataFrame({'[3]key':['number of records:','number of SNPs:'],'[4]value':[None,None]})
             """ Appending relevant info to dataframe... """
             print('blahhhhh')
-            print(bcftools.loc[bcftools['[3]key'] == 'number of records:','[4]value'].values)
+            print(bcftools.loc[bcftools['[3]key'] == 'number of records:','[4]value'].values[0])
+            print(bcftools.loc[bcftools['[3]key'] == 'number of SNPs:','[4]value'].values[0])
             dna_qc = dna_qc.append(pd.DataFrame({'Specimen ID':[subject],\
             'Micronic ID':[sample.split('_')[0]],'Pass QC (Y/N)':'N',\
             'Fingerprint':fp.Fingerprint.values,'Total Reads':raw.TOTAL_READS.values,\
@@ -123,7 +124,7 @@ for subject in samples.subject.unique():
             '%100x':final.PCT_TARGET_BASES_100X.values,\
             'Low Coverage Exons':[exons.loc[exons.pct_low_cov > 0.1].shape[0]],\
             'Number of Records':bcftools.loc[bcftools['[3]key'] == 'number of records:','[4]value'].values[0],\
-            'Number of SNPs':bcftools.loc[bcftools['[3]key'] == 'number of SNPs:','[4]value'].values}),ignore_index=True,sort=False)
+            'Number of SNPs':bcftools.loc[bcftools['[3]key'] == 'number of SNPs:','[4]value'].values[0]}),ignore_index=True,sort=False)
         elif samples.loc[(samples['subject'] == subject) & (samples['sample'] == sample),'status'].values[0] == 2:
             print('Warning in collectQC.py: this section of the script should not be running at rna_seq is not part of this pipeline')
             """ Picard Metrics """

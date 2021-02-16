@@ -172,6 +172,7 @@ process collectQC{
     file(insertsize)
     file(fingerprint)
     file(bcf)
+    file(unknown)
 
     when: ! ('chco_qc' in _skip_qc)
 
