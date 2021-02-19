@@ -1,5 +1,4 @@
 
-
 process IndexBamFile {
     label 'cpus_16'
     label 'container_llab'
@@ -402,6 +401,7 @@ def defineToolList() {
         'haplotypecaller',
         'joint_genotype',
         'deepvariant',
+        'somalier',
         // 'benchmark_dv_and_hc_against_giab',
         // 'benchmark_dv_against_hc',
         'hap_py',
@@ -445,6 +445,10 @@ def defineToolList() {
 
 //             return [idPatient, gender, status, idSample, bamFile, baiFile]
 //         }
+// }
+
+// def gen_pedigree(tsv_path){
+
 // }
 
 def extractBam(tsvFile) {
