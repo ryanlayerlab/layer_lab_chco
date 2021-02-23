@@ -71,7 +71,7 @@ git clone https://github.com/quinlan-lab/pathoscore.git /opt/pathoscore
 #pip install -r  /opt/pathoscore/requirements.txt
 
 # fetch somalier static binary
-wget https://github.com/brentp/somalier/releases/download/v0.2.11/somalier
+wget https://github.com/brentp/somalier/releases/download/v0.2.12/somalier
 chmod +x somalier
 mv somalier /opt/bin
  
@@ -92,6 +92,7 @@ cd /opt
 # install htslib
 git clone https://github.com/samtools/htslib.git
 cd htslib
+git submodule update --init --recursive
 autoheader
 autoconf
 ./configure --disable-bz2 --disable-lzma --enable-libcurl
