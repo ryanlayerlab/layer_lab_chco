@@ -78,6 +78,7 @@ if (params.input && (hasExtension(params.input, "tsv") || hasExtension(params.in
 if (params.input && (hasExtension(params.input, "vcf") || hasExtension(params.input, "vcf.gz"))) step = "annotate"
 
 ch_input_sample = Channel.empty()
+ch_tsv_path = Channel.value(file(tsv_path))
 if (tsv_path) {
     tsvFile = file(tsv_path)
     switch (step) {
@@ -114,7 +115,9 @@ params.fasta_fai = params.genome && params.fasta ? params.genomes[params.genome]
 params.fasta_gz = params.genome && !('annotate' in step) ? params.genomes[params.genome].fasta_gz ?: null : null
 params.fasta_gz_fai = params.genome && params.fasta ? params.genomes[params.genome].fasta_gz_fai ?: null : null
 params.fasta_gzi = params.genome && !('annotate' in step) ? params.genomes[params.genome].fasta_gzi ?: null : null
-params.somalier_sites = params.genome ? params.genomes[params.genome].somalier_sites : null
+params.somalier_sites = params.genome ? params.genomes[params.genome].somalier_sites : params.somalier_sites
+params.somalier_ancestry_labels_1kg = params.genome ? params.genomes[params.genome].somalier_ancestry_labels_1kg : params.somalier_ancestry_labels_1kg
+params.somalier_extracted_1kg = params.genome ? params.genomes[params.genome].somalier_extracted_1kg : params.somalier_extracted_1kg
 
 // Annotation related params (snpEff)
 params.snpEff_db = params.genome && ('annotate' in step) ? params.genomes[params.genome].snpEff_db ?: null : null
@@ -161,7 +164,10 @@ params.known_indels = params.genome && ( 'mapping' in step || 'markdups' in step
 params.known_indels_index = params.genome && params.known_indels ? params.genomes[params.genome].known_indels_index ?: null : null
 
 
+// ch_somalier_sites = params.somalier_sites ? Channel.value(file(params.somalier_sites)) : "null"
 ch_somalier_sites = params.somalier_sites ? Channel.value(file(params.somalier_sites)) : "null"
+ch_somalier_ancestry_labels_1kg = params.somalier_ancestry_labels_1kg ? Channel.value(file(params.somalier_ancestry_labels_1kg)) : "null"
+ch_somalier_extracted_1kg = params.somalier_extracted_1kg ? Channel.value(file(params.somalier_extracted_1kg)) : "null"
 ch_acLoci = params.ac_loci && 'ascat' in tools ? Channel.value(file(params.ac_loci)) : "null"
 ch_acLoci_GC = params.ac_loci_GC && 'ascat' in tools ? Channel.value(file(params.ac_loci_GC)) : "null"
 ch_chrDir = params.chr_dir && 'controlfreec' in tools ? Channel.value(file(params.chr_dir)) : "null"
@@ -244,8 +250,9 @@ include {wf_gather_mapped_partial_reads} from './lib/wf_gather_mapped_partial_re
 include {wf_filter_and_gather_mapped_partial_reads} from './lib/wf_filter_and_gather_mapped_partial_reads' 
 include {wf_qc_bam_mapped} from './lib/wf_qc_bam_mapped' 
 include {wf_mark_duplicates} from './lib/wf_mark_duplicates' 
-include {wf_mark_duplicates_raw_bams} from './lib/wf_mark_duplicates_raw_bams.nf' 
-include {wf_somalier_extraction} from './lib/wf_somalier_extraction' 
+include {wf_mark_duplicates_raw_bams} from './lib/wf_mark_duplicates_raw_bams' 
+include {wf_somalier} from './lib/wf_somalier' 
+
 include {wf_recal_bam} from './lib/wf_recal_bam' 
 include {wf_qc_bam_recal} from './lib/wf_qc_bam_recal' 
 include {wf_deepvariant} from './lib/wf_deepvariant' 
@@ -263,7 +270,7 @@ include {wf_vcf_stats} from './lib/wf_vcf_stats'
 include {wf_multiqc} from './lib/wf_multiqc' 
 include {ConcatVCF} from './lib/wf_haplotypecaller'
 include {wf_alamut} from './lib/wf_alamut'
-include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites} from './lib/wf_quality_control'
+include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC} from './lib/wf_quality_control'
 
 workflow{
 
@@ -351,11 +358,14 @@ workflow{
             wf_mark_duplicates(ch_bam_mapped)
             ch_bam_marked = wf_mark_duplicates.out.dm_bams
     }
-    // Run Somalier extraction step
-    wf_somalier_extraction(ch_bam_marked,
-                            ch_fasta,
-                            ch_fasta_fai,
-                            ch_somalier_sites)
+
+    wf_somalier(ch_bam_marked,
+                ch_fasta,
+                ch_fasta_fai,
+                ch_tsv_path,
+                ch_somalier_sites,
+                ch_somalier_ancestry_labels_1kg,
+                ch_somalier_extracted_1kg)
     // GATK Base Quality Score Recalibration
     wf_recal_bam(
             ch_bam_marked, // recalibrated bams
@@ -384,7 +394,7 @@ workflow{
     // QC stats that go into final QC excel report
     exonCoverage(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed,"recal")
     onTarget(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_padded_target_bed)
-    wf_raw_bam_exonCoverage(wf_mark_duplicates_raw_bams.out.dm_bams,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
+    wf_raw_bam_exonCoverage(ch_bam_mapped,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
     insertSize(ch_bam_recal)
     wf_qc_fingerprinting_sites(ch_bam_recal,qc_extra_finger_print_sites)
     dnaFingerprint(ch_bam_recal,qc_finger_print_sites,"Normal")
@@ -643,6 +653,7 @@ c) recalibrated bams
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcf_with_index)
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
     collectQC(file(tsv_path), params.outdir,exonCoverage.out.files.collect(),wf_raw_bam_exonCoverage.out.raw_onTarget.collect(),insertSize.out,dnaFingerprint.out.collect(),wf_vcf_stats.out.bcfootls_stats.collect(),wf_alamut.out.collect())
+    add_somalier_to_QC(wf_somalier.out.related, wf_somalier.out.pedigree, collectQC.out)
 } // end of workflow
 
 

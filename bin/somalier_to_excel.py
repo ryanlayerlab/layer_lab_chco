@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import pandas as pd
 import sys
 
@@ -19,7 +18,7 @@ def excelAutofit(df,name,writer,pcts=[],dec=[],hidden=[],max_width=60):
     chr(65 + (df.shape[1] - 1)%26)).replace('@','') + str(df.shape[0] + 1))
     return writer
 
-df = pd.read_excel(sys.argv[1])
+df = pd.read_excel(sys.argv[1],engine='openpyxl')
 df_samples = pd.read_csv(sys.argv[2],sep='\t')
 df_pairs = pd.read_csv(sys.argv[3],sep='\t')
 manifest_file = sys.argv[4]
@@ -27,45 +26,33 @@ manifest_file = sys.argv[4]
 # df = pd.read_excel('QC_Stats.xlsx')
 # df_samples = pd.read_csv('somalier.samples.tsv',sep='\t')
 # df_pairs = pd.read_csv('somalier.pairs.tsv',sep='\t')
-# manifest_file = 'Samplesheet_TEST15.csv'
+# manifest_file = 'pedigree.ped'
 
 # load the manifest file
-manifest = None
 relations = {}
 reached_data = False
-for line in open(manifest_file):
+for line in open(manifest_file,'r'):
     line = line.strip()
-    if not reached_data and '[Data]' not in line:
-        continue
-    if '[Data]' in line:
-        reached_data = True
-        continue
-    row = line.split(',')
-    if manifest is None:
-        manifest = {x:[] for x in row}
+    row = line.split('\t')
+
+    family = row[0]
+    sample_id = row[1]
+    if family in relations:
+        relations[family].append(sample_id)
     else:
-        family = row[10]
-        sample_id = row[0]
-        if family in relations:
-            relations[family].append(sample_id)
-        else:
-            relations[family] = [sample_id]
-        for i,key in enumerate(manifest.keys()):
-            if i < len(row):
-                manifest[key].append(row[i])
-            else:
-                manifest[key].append(None)
+        relations[family] = [sample_id]
 
 redundant_relations = {}
 for family in relations:
+    print(family)
     for id in relations[family]:
+        print('\t',id)
         redundant_relations[id] = []
         for id2 in relations[family]:
             if id == id2:
                 continue
             redundant_relations[id].append(id2)
 
-manifest = pd.DataFrame(manifest)
 
 # collected the predicted sex of each sample
 sexes = []
@@ -79,6 +66,7 @@ for samp in df['Specimen ID'].unique():
     if x_het > 20:
         sex = 'female'
     sexes.append(sex)
+
 df['sex'] = sexes
 
 # go through pairs, get all things things related (>.4) to each sample
@@ -138,3 +126,5 @@ writer = excelAutofit(df,'DNA Overview',writer,\
 pcts=['% Dups','%10x','%50x','%100x','% Quality','% On Target','sex'])
 writer.sheets['DNA Overview'].freeze_panes(1,2)
 writer.save()
+
+

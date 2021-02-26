@@ -189,3 +189,27 @@ process collectQC{
         collectQC.py ${sample_file} ${params.outdir} \$PWD
     """
 }
+
+process add_somalier_to_QC{
+    label 'container_gatk'
+    publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
+
+    input:
+    tuple file(html), file(pairs), file(samples)
+    file(pedigree)
+	file(pre_QC_stats)
+
+
+    when: ! ('chco_qc' in _skip_qc)
+
+    output:
+    file("QC_Stats_Final.xlsx")
+
+
+    script:
+    """
+        python -m pip install openpyxl
+        python -m pip install xlsxwriter 
+        somalier_to_excel.py $pre_QC_stats $samples $pairs $pedigree
+    """
+}
