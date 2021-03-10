@@ -40,8 +40,10 @@ process MantaSingle {
     when: 'manta_single' in tools
 
     script:
-    beforeScript = params.target_bed ? "bgzip --threads ${task.cpus} -c ${targetBED} > call_targets.bed.gz ; tabix call_targets.bed.gz" : ""
-    options = params.target_bed ? "--exome  --callRegions call_targets.bed.gz" : ""
+    beforeScript=""
+    // beforeScript = params.target_bed ? "bgzip --threads ${task.cpus} -c ${targetBED} > call_targets.bed.gz ; tabix call_targets.bed.gz" : ""
+    //options = params.target_bed ? "--exome  --callRegions call_targets.bed.gz" : ""
+    options = params.target_bed ? "--exome " : ""
     status = status_map[idPatient, idSample]
     inputbam = status == 0 ? "--bam" : "--tumorBam"
     vcftype = status == 0 ? "diploid" : "tumor"
