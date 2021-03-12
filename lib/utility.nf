@@ -136,7 +136,7 @@ def helpMessage() {
                                     Available: Mapping, Recalibrate, VariantCalling, Annotate
                                     Default: Mapping
         --tools                     Specify tools to use for variant calling:
-                                    Available: HaplotypeCaller,Joint_genotype, DeepVariant, gatk_cnv_germline,
+                                    Available: HaplotypeCaller, Joint_genotype, DeepVariant, gatk_cnv_germline,
                                     cnvkit_single,   
                                     Manta_single, mpileup, Mutect2, Mutect2_Single, gatk_cnv_somatic, 
                                     savvy_cnv_somatic, cnvkit_somatic, Strelka, TIDDIT,
