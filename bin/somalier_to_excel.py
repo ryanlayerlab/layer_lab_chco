@@ -69,6 +69,13 @@ for samp in df['Specimen ID'].unique():
 
 df['sex'] = sexes
 
+# collected the predicted sex of each sample
+unknown_counts = []
+for samp in df['Specimen ID'].unique():
+    unknown_counts.append(list(df_samples[df_samples['sample_id'] == samp]['n_unknown'])[0])
+
+df['num_unknown_sites'] = unknown_counts
+
 # go through pairs, get all things things related (>.4) to each sample
 samples_related_dict = {}
 for i in range(df_pairs.shape[0]):
@@ -121,9 +128,16 @@ df['relatedness_unexpected'] = [len([y for y in samples_related_dict[x] if y not
 df['ibs0_unexpected'] = [len([y for y in samples_ibs0_dict[x] if y not in redundant_relations[x]]) if x in samples_ibs0_dict else 'N/A' for x in list(df['Specimen ID'])]
 df['ibs2_unexpected'] = [len([y for y in samples_ibs2_dict[x] if y not in redundant_relations[x]]) if x in samples_ibs2_dict else 'N/A' for x in list(df['Specimen ID'])]
 
+# list the sample names for the unexpected relationships
+df['relatedness_unexpected_names'] = [';'.join([y for y in samples_related_dict[x] if y not in redundant_relations[x]] )if x in samples_related_dict else 'N/A' for x in list(df['Specimen ID'])]
+df['ibs0_unexpected_names'] = [';'.join([y for y in samples_ibs0_dict[x] if y not in redundant_relations[x]]) if x in samples_ibs0_dict else 'N/A' for x in list(df['Specimen ID'])]
+df['ibs2_unexpected_names'] = [';'.join([y for y in samples_ibs2_dict[x] if y not in redundant_relations[x]]) if x in samples_ibs2_dict else 'N/A' for x in list(df['Specimen ID'])]
+
+
+
 writer = pd.ExcelWriter('QC_Stats_Final.xlsx',engine='xlsxwriter')
 writer = excelAutofit(df,'DNA Overview',writer,\
-pcts=['% Dups','%10x','%50x','%100x','% Quality','% On Target','sex'])
+pcts=['% Dups','%20x','%50x','%100x','% Quality','% On Target','sex'])
 writer.sheets['DNA Overview'].freeze_panes(1,2)
 writer.save()
 
