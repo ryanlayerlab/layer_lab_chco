@@ -104,8 +104,9 @@ def layerLabMessage() {
 def helpMessage() {
   // Display help message
     log.info layerLabMessage()
+    tools = defineToolList().join(", ")
     log.info"""
-
+    
     Usage:
 
     The typical command for running the pipeline is as follows:
@@ -136,13 +137,15 @@ def helpMessage() {
                                     Available: Mapping, Recalibrate, VariantCalling, Annotate
                                     Default: Mapping
         --tools                     Specify tools to use for variant calling:
-                                    Available: ASCAT, ControlFREEC, FreeBayes, HaplotypeCaller, DeepVariant, 
-                                    Manta, mpileup, Mutect2, Mutect2_Single, gen_somatic_pon, gen_read_count_pon, 
-                                    Strelka, TIDDIT
+                                    Available: HaplotypeCaller, Joint_genotype, DeepVariant, gatk_cnv_germline,
+                                    cnvkit_single,   
+                                    Manta_single, mpileup, Mutect2, Mutect2_Single, gatk_cnv_somatic, 
+                                    savvy_cnv_somatic, cnvkit_somatic, Strelka, TIDDIT,
+                                    and/or for sample general qc, relatedness, and ancestry:
+                                    somalier,
                                     and/or for annotation:
-                                    snpEff, VEP, merge
-                                    and for pipline validation (if you have added GIAB samples):
-                                    hap_py
+                                    snpEff, VEP
+                                    
                                     Default: None
         --skip_qc                   Specify which QC tools to skip when running the pipeline
                                     Available: all, bamQC, BCFtools, FastQC, MultiQC, samtools, vcftools, versions
@@ -395,35 +398,35 @@ def defineStepList() {
 // Define list of available tools
 def defineToolList() {
     return [
-        'ascat',
-        'controlfreec',
-        'dnascope',
-        'dnaseq',
-        'freebayes',
+        // 'ascat',
+        // 'controlfreec',
+        // 'dnascope',
+        // 'dnaseq',
+        // 'freebayes',
         'haplotypecaller',
         'joint_genotype',
         'deepvariant',
         'somalier',
         // 'benchmark_dv_and_hc_against_giab',
         // 'benchmark_dv_against_hc',
-        'hap_py',
-        'manta',
-        'merge',
+        // 'hap_py',
+        // 'manta',
+        // 'merge',
         'mpileup',
         'gatk_cnv_somatic',
         'gatk_cnv_germline',
         'savvy_cnv_somatic',
-        'savvy_cnv_germline',
+        // 'savvy_cnv_germline',
         'cnvkit_somatic',
         'cnvkit_single',
         'mutect2',
         'mutect2_single',
         'manta_single',
-        'gen_read_count_pon',
+        // 'gen_read_count_pon',
         'snpeff',
         'strelka',
         'tiddit',
-        'tnscope',
+        //'tnscope',
         'vep',
         'alamut'
     ]

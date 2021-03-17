@@ -265,6 +265,7 @@ include {wf_jointly_genotype_gvcf} from './lib/wf_jointly_genotype_gvcf'
 include {wf_gatk_cnv_somatic} from './lib/wf_gatk_cnv_somatic' 
 include {wf_savvy_cnv_somatic} from './lib/wf_savvy_cnv_somatic' 
 include {wf_cnvkit_somatic} from './lib/wf_cnvkit_somatic' 
+include {wf_cnvkit_single} from './lib/wf_cnvkit_single' 
 include {wf_manta_single} from './lib/wf_manta_single' 
 include {wf_vcf_stats} from './lib/wf_vcf_stats' 
 include {wf_multiqc} from './lib/wf_multiqc' 
@@ -303,6 +304,7 @@ workflow{
     ch_bam_mapped = Channel.empty()
     ch_bam_mapped_raw = Channel.empty()
     ch_fastqc_report = Channel.empty()
+    ch_bam_for_cnv = Channel.empty()
     
     if (step == 'mapping'){
         wf_fastqc_fq(ch_input_sample)
@@ -333,7 +335,8 @@ workflow{
             // Since ch_bam_mapped (the raw bams) wont be used often for downstream analysis
             // we keep them aside but only after duplcate marking
             wf_mark_duplicates_raw_bams(ch_bam_mapped)
-            
+            ch_bam_mapped_raw = wf_mark_duplicates_raw_bams.out.dm_bams
+            ch_bam_for_cnv = ch_bam_mapped_raw
             ch_bam_mapped = wf_filter_and_gather_mapped_partial_reads.out
         }
             
@@ -425,10 +428,13 @@ c) recalibrated bams
     )
 
     ch_bam_for_vc = Channel.empty()
+    
     if ((step == 'variantcalling') || (step ==  'joint_genotype') ){
        ch_bam_for_vc = ch_input_sample 
+       ch_bam_for_cnv = ch_input_sample 
     } else{
         ch_bam_for_vc = ch_bam_recal
+
     }
 
     // Handle the Mutect2 related workflows
@@ -584,7 +590,7 @@ c) recalibrated bams
     wf_savvy_cnv_somatic(ch_bam_for_vc)
     
     (ch_normal_md_bam, ch_tumor_md_bam) = 
-        ch_bam_marked.branch{
+        ch_bam_for_vc.branch{
             _:  status_map[it[0], it[1]] == 0
             __: status_map[it[0], it[1]] == 1
         }
@@ -613,10 +619,17 @@ c) recalibrated bams
                         ch_fasta_fai,
                         ch_target_bed
                         )
-    wf_manta_single(ch_bam_for_vc,
+    wf_manta_single(ch_bam_for_cnv,
                     ch_target_bed,
                     ch_fasta,
                     ch_fasta_fai
+                    )
+    wf_cnvkit_single(
+                    ch_bam_for_cnv,
+                    ch_target_bed,
+                    ch_fasta,
+                    ch_fasta_fai,
+                    ch_cnvkit_ref
                     )
     // wf_cnvkit_cnv(
     //     ch_bams.collect(),
