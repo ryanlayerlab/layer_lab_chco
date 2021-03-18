@@ -323,7 +323,7 @@ workflow{
                                 '')
         ch_bam_mapped = wf_gather_mapped_partial_reads.out.bams_mapped
         // Now we check if we need to filter the bams
-        if (params.filter_bams){
+        if (params.filter_bams || ! ('chco_qc' in skipQC)){
             // In this case we'll use the filtered bams for most downstream analyses
             // We still keep the raw (unfiltered bams) around for copy number callers
             // ch_partial_mapped_reads.dump(tag:'target for filtering:')
@@ -665,7 +665,7 @@ c) recalibrated bams
     wf_alamut(wf_haplotypecaller.out.gvcf_per_sample)
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcf_with_index)
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcfs_with_indexes)
-    collectQC(file(tsv_path), params.outdir,exonCoverage.out.files.collect(),wf_raw_bam_exonCoverage.out.raw_onTarget.collect(),insertSize.out,dnaFingerprint.out.collect(),wf_vcf_stats.out.bcfootls_stats.collect(),wf_alamut.out.collect())
+    collectQC(file(tsv_path), params.outdir,exonCoverage.out.files.collect(),wf_raw_bam_exonCoverage.out.raw_onTarget.collect(),insertSize.out,dnaFingerprint.out.collect(),wf_vcf_stats.out.bcfootls_stats.collect(),wf_haplotypecaller.out.gvcf_per_sample.collect())
     add_somalier_to_QC(wf_somalier.out.related, wf_somalier.out.pedigree, collectQC.out)
 } // end of workflow
 
