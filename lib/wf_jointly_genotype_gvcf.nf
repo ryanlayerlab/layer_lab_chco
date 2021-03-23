@@ -206,7 +206,7 @@ process SelectVariants {
     output:
     // tuple val("HaplotypeCaller_Jointly_Genotyped"), id_patient, id_sample, file("${interval_bed.baseName}_${id_sample}.vcf"), emit: vcf_SelectVariants
     
-    tuple val("HaplotypeCaller_Jointly_Genotyped"), idSample, file("${idSample}.vcf.gz"), file("${idSample}.vcf.gz.tbi")
+    tuple val("HaplotypeCaller_Jointly_Genotyped"), val('patient id placeholder') ,idSample, file("${idSample}.vcf.gz"), file("${idSample}.vcf.gz.tbi")
     tuple file("${idSample}.vcf.gz"), file("${idSample}.vcf.gz.tbi")
     when: ('joint_genotype' in tools )
 

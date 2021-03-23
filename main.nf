@@ -271,8 +271,7 @@ include {wf_vcf_stats} from './lib/wf_vcf_stats'
 include {wf_multiqc} from './lib/wf_multiqc' 
 include {ConcatVCF} from './lib/wf_haplotypecaller'
 include {wf_alamut} from './lib/alamut'
-include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites} from './lib/quality_control'
-
+include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC} from './lib/wf_quality_control'
 workflow{
 
     wf_get_software_versions()
@@ -323,7 +322,7 @@ workflow{
                                 '')
         ch_bam_mapped = wf_gather_mapped_partial_reads.out.bams_mapped
         // Now we check if we need to filter the bams
-        if (params.filter_bams){
+        if (params.filter_bams ){
             // In this case we'll use the filtered bams for most downstream analyses
             // We still keep the raw (unfiltered bams) around for copy number callers
             // ch_partial_mapped_reads.dump(tag:'target for filtering:')
@@ -395,12 +394,12 @@ workflow{
             )
 
     // QC stats that go into final QC excel report
-    // exonCoverage(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed,"recal")
-    // onTarget(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_padded_target_bed)
-    // wf_raw_bam_exonCoverage(ch_bam_mapped,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
-    // insertSize(ch_bam_recal)
-    // wf_qc_fingerprinting_sites(ch_bam_recal,qc_extra_finger_print_sites)
-    // dnaFingerprint(ch_bam_recal,qc_finger_print_sites,"Normal")
+    exonCoverage(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed,"recal")
+    onTarget(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_padded_target_bed)
+    wf_raw_bam_exonCoverage(ch_bam_mapped,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
+    insertSize(ch_bam_recal)
+    wf_qc_fingerprinting_sites(ch_bam_recal,qc_extra_finger_print_sites)
+    dnaFingerprint(ch_bam_recal,qc_finger_print_sites,"Normal")
 
 /* At this point we have the following bams:
 a) raw unmarked bams
@@ -647,7 +646,7 @@ c) recalibrated bams
     //     wf_jointly_genotype_gvcf.out.vcfs_with_indexes
     //     )
     wf_vcf_stats(wf_deepvariant.out.vcf,
-        Channel.empty()
+        wf_jointly_genotype_gvcf.out.vcf_with_index
         )
 
     wf_multiqc(
@@ -663,7 +662,8 @@ c) recalibrated bams
     )
 
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcf_with_index)
-    // collectQC(file(tsv_path), params.outdir,exonCoverage.out,wf_raw_bam_exonCoverage.out,insertSize.out,dnaFingerprint.out,wf_vcf_stats.out.bcfootls_stats,wf_alamut.out)
+    collectQC(file(tsv_path), params.outdir,exonCoverage.out,wf_raw_bam_exonCoverage.out,insertSize.out,dnaFingerprint.out,wf_vcf_stats.out.bcfootls_stats,wf_jointly_genotype_gvcf.out.vcf_with_index)
+    add_somalier_to_QC(wf_somalier.out.related, wf_somalier.out.pedigree, collectQC.out)
 } // end of workflow
 
 

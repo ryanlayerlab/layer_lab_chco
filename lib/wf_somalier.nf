@@ -31,6 +31,9 @@ workflow wf_somalier{
         SomalierAncestry(_1kg_ancestry_labels,
                         _1kg_somalier_extracted,
                         SomalierExtraction.out.collect())
+        emit:
+            related = SomalierRelate.out
+            pedigree = _pedigree
 } // end of wf_mpileup
 
 process GenPedigreeFile {
@@ -94,9 +97,7 @@ process SomalierRelate {
     //    file("*")
 
     output:
-        file("somalier.html")
-        file("somalier.pairs.tsv")
-        file("somalier.samples.tsv")
+        tuple file("somalier.html"), file("somalier.pairs.tsv"), file("somalier.samples.tsv")
 
     when: 'somalier' in  tools
 

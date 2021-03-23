@@ -24,7 +24,7 @@ process IndexBamFile {
 
 process ConcatVCF {
     label 'cpus_8'
-
+    label 'container_llab'
     tag {variantCaller + "-" + idSample}
 
     publishDir "${params.outdir}/VariantCalling/${idSample}/${output_dir}", mode: params.publish_dir_mode
@@ -425,7 +425,9 @@ def defineToolList() {
         'strelka',
         'tiddit',
         // 'tnscope',
-        'vep'
+        'vep',
+	'alamut',
+	'somalier'
     ]
 }
 

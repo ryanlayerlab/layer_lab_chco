@@ -7,3 +7,6 @@ results/
 Makefile
 .nextflow/
 .nextflow.log*
+*.bed
+*.tsv
+cnv_work_space/

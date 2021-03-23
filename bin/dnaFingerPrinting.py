@@ -16,7 +16,7 @@ def dnaFingerprint(bam,vcf,sample):
                 float(coverage[nucs.index(probes.loc[ind,'Minor'])][0] + coverage[nucs.index(probes.loc[ind,'Major'])][0])
             else:
                 probes.loc[ind,'AF'] = float('NaN')
-        probes.loc[ind,'DP'] = sum([sum(coverage[ind]) for ind in range(len(coverage))])
+        probes.loc[ind,'DP'] = sum([sum(coverage[i]) for i in range(len(coverage))])
     probes.loc[probes.AF < 0.2,'Fingerprint'] = 0
     probes.loc[(probes.AF > 0.3) & (probes.AF < 0.7),'Fingerprint'] = 1
     probes.loc[probes.AF > 0.8,'Fingerprint'] = 2
