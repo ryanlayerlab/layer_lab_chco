@@ -118,8 +118,8 @@ process insertSize{
 
 
     output:
-    file("${idSample}_insert_size_metrics.txt")
-        file("${idSample}_insert_size_histogram.pdf")
+    path "${idSample}_insert_size_metrics.txt", emit: files
+    file("${idSample}_insert_size_histogram.pdf")
 
     when: ! ('chco_qc' in _skip_qc)
 
@@ -165,13 +165,11 @@ process collectQC{
     file(sample_file)
     file(results_dir)
     file(exon)
-    file(exon2)
     file(raw_exon)
     file(insertsize)
     file(fingerprint)
     file(bcf)
     file(unknown)
-    file(unknown2)
 
     when: ! ('chco_qc' in _skip_qc)
 
@@ -210,5 +208,28 @@ process add_somalier_to_QC{
         python -m pip install openpyxl
         python -m pip install xlsxwriter 
         somalier_to_excel.py $pre_QC_stats $samples $pairs $pedigree
+    """
+}
+
+process add_cohort_vc_to_qc_report{
+    tag {idPatient + "-" + idSample}
+    label 'container_gatk'
+
+    publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
+
+    input:
+    tuple file(vcfgz), file(vcfgzindex)
+    file(qc_file)
+
+    output:
+    file('QC_Stats_Final_HCvcf.xlsx')
+
+    script:
+    """
+    python -m pip install openpyxl
+    python -m pip install xlsxwriter
+    zcat $vcfgz | add_sample_count_to_cohort_vcf.py > cohort_vcf_with_count_column.tsv
+    # add it to the QC report now
+    add_cohort_vcf_to_qc.py $qc_file cohort_vcf_with_count_column.tsv
     """
 }

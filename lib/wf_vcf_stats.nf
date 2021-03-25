@@ -25,6 +25,7 @@ process BcftoolsStats {
     tag {"${variantCaller} - ${vcf}"}
 
     publishDir "${params.outdir}/Reports/${idSample}/BCFToolsStats/${variantCaller}", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/QC/${idSample}/BCFTools/${variantCaller}", mode: params.publish_dir_mode
 
     input:
         // tuple variantCaller, idSample, file(vcf)

@@ -271,7 +271,7 @@ include {wf_vcf_stats} from './lib/wf_vcf_stats'
 include {wf_multiqc} from './lib/wf_multiqc' 
 include {ConcatVCF} from './lib/wf_haplotypecaller'
 include {wf_alamut} from './lib/alamut'
-include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC} from './lib/wf_quality_control'
+include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC; add_cohort_vc_to_qc_report} from './lib/wf_quality_control'
 workflow{
 
     wf_get_software_versions()
@@ -662,8 +662,14 @@ c) recalibrated bams
     )
 
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcf_with_index)
-    collectQC(file(tsv_path), params.outdir,exonCoverage.out,wf_raw_bam_exonCoverage.out,insertSize.out,dnaFingerprint.out,wf_vcf_stats.out.bcfootls_stats,wf_jointly_genotype_gvcf.out.vcf_with_index)
-    add_somalier_to_QC(wf_somalier.out.related, wf_somalier.out.pedigree, collectQC.out)
+    bcf_stats = wf_vcf_stats.out.bcfootls_stats.collect()
+    exon_coverages = exonCoverage.out.files.collect()
+    raw_exon_coverage = wf_raw_bam_exonCoverage.out.raw_onTarget.collect()
+    insert_sizes = insertSize.out.files.collect()
+    fignerprinting = dnaFingerprint.out.collect()
+    collectQC(file(tsv_path), params.outdir,exon_coverages,raw_exon_coverage,insert_sizes,fignerprinting,bcf_stats,wf_jointly_genotype_gvcf.out.vcf_with_index.collect())
+    add_somalier_to_QC(wf_somalier.out.related.collect(), wf_somalier.out.pedigree, collectQC.out)
+    add_cohort_vc_to_qc_report(wf_jointly_genotype_gvcf.out.cohort_vcf_with_index,add_somalier_to_QC.out)
 } // end of workflow
 
 
