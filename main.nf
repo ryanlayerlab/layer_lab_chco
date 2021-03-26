@@ -190,6 +190,7 @@ ch_read_count_pon = params.read_count_pon ? Channel.value(file(params.read_count
 ch_somatic_pon = params.somatic_pon ? Channel.value(file(params.somatic_pon)) : "null"
 ch_somatic_pon_index = params.somatic_pon_index ? Channel.value(file(params.somatic_pon_index)) : "null"
 ch_target_bed = params.target_bed ? Channel.value(file(params.target_bed)) : "null"
+ch_cnv_target_bed = params.cnv_target_bed ? Channel.value(file(params.cnv_target_bed)) : "null"
 // padded target, if specified also generate CollectHsMetrics for the recal bams intersected with the padded bed
 ch_padded_target_bed = params.padded_target_bed ? Channel.value(file(params.padded_target_bed)) : "null"
 ch_bait_bed = params.bait_bed ? Channel.value(file(params.bait_bed)) : "null"
@@ -222,6 +223,7 @@ ch_cadd_InDels_tbi = params.cadd_InDels_tbi ? Channel.value(file(params.cadd_InD
 ch_cadd_WG_SNVs = params.cadd_WG_SNVs ? Channel.value(file(params.cadd_WG_SNVs)) : "null"
 ch_cadd_WG_SNVs_tbi = params.cadd_WG_SNVs_tbi ? Channel.value(file(params.cadd_WG_SNVs_tbi)) : "null"
 ch_cnvkit_ref = params.cnvkit_ref ? Channel.value(file(params.cnvkit_ref)) : "null"
+ch_savvy_controls_dir = params.savvy_controls_dir ? Channel.value(file(params.savvy_controls_dir)) : "null"
 
 // Optional CHCO files for calculating TP, FP, TN etc against the GIAB
 ch_giab_highconf_vcf = params.giab_highconf_vcf ? Channel.value(file(params.giab_highconf_vcf)) : "null"
@@ -263,9 +265,11 @@ include {wf_haplotypecaller} from './lib/wf_haplotypecaller'
 include {wf_individually_genotype_gvcf} from './lib/wf_individually_genotype_gvcf' 
 include {wf_jointly_genotype_gvcf} from './lib/wf_jointly_genotype_gvcf' 
 include {wf_gatk_cnv_somatic} from './lib/wf_gatk_cnv_somatic' 
+include {wf_gatk_cnv_germline} from './lib/wf_gatk_cnv_germline' 
 include {wf_savvy_cnv_somatic} from './lib/wf_savvy_cnv_somatic' 
 include {wf_cnvkit_somatic} from './lib/wf_cnvkit_somatic' 
 include {wf_cnvkit_single} from './lib/wf_cnvkit_single' 
+include {wf_cnvkit_gen_ref} from './lib/wf_cnvkit_gen_ref' 
 include {wf_manta_single} from './lib/wf_manta_single' 
 include {wf_vcf_stats} from './lib/wf_vcf_stats' 
 include {wf_multiqc} from './lib/wf_multiqc' 
@@ -587,7 +591,8 @@ c) recalibrated bams
         ch_read_count_pon
     )
     
-    wf_savvy_cnv_somatic(ch_bam_for_vc)
+    wf_savvy_cnv_somatic(ch_bam_for_vc,
+                         ch_savvy_controls_dir)
     
     (ch_normal_md_bam, ch_tumor_md_bam) = 
         ch_bam_for_vc.branch{
@@ -624,9 +629,18 @@ c) recalibrated bams
                     ch_fasta,
                     ch_fasta_fai
                     )
+    if('cnvkit_gen_ref' in tools ){
+        wf_cnvkit_gen_ref(
+                        ch_bam_for_cnv,
+                        ch_cnv_target_bed,
+                        ch_fasta,
+                        ch_fasta_fai
+                        )
+    }
+
     wf_cnvkit_single(
                     ch_bam_for_cnv,
-                    ch_target_bed,
+                    ch_cnv_target_bed,
                     ch_fasta,
                     ch_fasta_fai,
                     ch_cnvkit_ref
