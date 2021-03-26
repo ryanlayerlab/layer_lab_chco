@@ -274,7 +274,7 @@ include {wf_vcf_stats} from './lib/wf_vcf_stats'
 include {wf_multiqc} from './lib/wf_multiqc' 
 include {ConcatVCF} from './lib/wf_haplotypecaller'
 include {wf_alamut} from './lib/alamut'
-include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC; add_cohort_vc_to_qc_report} from './lib/wf_quality_control'
+include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC; add_cohort_vc_to_qc_report; add_cohort_CNVs_to_qc_report} from './lib/wf_quality_control'
 include {manta_to_bed; savvy_to_bed; combine_callers; combine_samples} from './lib/wf_agg_cnv'
 
 workflow{
@@ -695,7 +695,7 @@ c) recalibrated bams
     collectQC(file(tsv_path), params.outdir,exon_coverages,raw_exon_coverage,insert_sizes,fignerprinting,bcf_stats,vcfs)
     add_somalier_to_QC(wf_somalier.out.related.collect(), wf_somalier.out.pedigree, collectQC.out)
     add_cohort_vc_to_qc_report(wf_jointly_genotype_gvcf.out.cohort_vcf_with_index,add_somalier_to_QC.out)
-
+    add_cohort_CNVs_to_qc_report(combine_samples.out.cnv_all_samples_vcf,add_cohort_vc_to_qc_report.out)
 } // end of workflow
 
 

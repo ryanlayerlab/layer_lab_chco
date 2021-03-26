@@ -90,7 +90,8 @@ process combine_samples{
 
     output:
     file("aggregated_multi_sample_multi_caller.bed")
-	file("*.vcf")
+    file("*.vcf")
+    path "cnv_all_samples.vcf", emit: cnv_all_samples_vcf
 
     script:
     """

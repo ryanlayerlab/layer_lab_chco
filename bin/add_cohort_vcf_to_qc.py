@@ -22,6 +22,7 @@ def excelAutofit(df, name, writer, pcts=[], dec=[], hidden=[], max_width=60):
 
 qc_file = sys.argv[1]
 vcf_file = sys.argv[2]
+tab_name = sys.argv[3]
 # qc_file = 'Data/QC_Stats_Final.xlsx'
 # vcf_file = 'cohort_vcf.tsv'
 
@@ -39,12 +40,12 @@ for line in open(vcf_file,'r'):
 names[-1] = 'count'
 vcf.columns = names
 
-writer = pd.ExcelWriter('QC_Stats_Final_HCvcf.xlsx', engine='xlsxwriter')
+writer = pd.ExcelWriter('QC_Stats_Final.xlsx', engine='xlsxwriter')
 writer = excelAutofit(df, 'DNA Overview', writer, \
                       pcts=['% Dups', '%20x', '%50x', '%100x', '% Quality', '% On Target', 'sex'])
 writer.sheets['DNA Overview'].freeze_panes(1, 2)
 
-vcf.to_excel(writer, sheet_name='Cohort VCF')
+vcf.to_excel(writer, sheet_name=tab_name)
 
 writer.save()
-#writer.close()
+writer.close()

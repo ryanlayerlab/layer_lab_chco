@@ -157,7 +157,7 @@ process dnaFingerprint{
 }
 
 process collectQC{
-    label 'container_llab'
+    label 'container_container_py3_pandas'
     publishDir "${params.outdir}/Reports/${idSample}/FingerPrinting/", mode: params.publish_dir_mode
     publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
 
@@ -188,7 +188,7 @@ process collectQC{
 }
 
 process add_somalier_to_QC{
-    label 'container_llab'
+    label 'container_container_py3_pandas'
     publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
 
     input:
@@ -211,7 +211,7 @@ process add_somalier_to_QC{
 
 process add_cohort_vc_to_qc_report{
     tag {idPatient + "-" + idSample}
-    label 'container_llab'
+    label 'container_container_py3_pandas'
 
     publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
 
@@ -220,12 +220,33 @@ process add_cohort_vc_to_qc_report{
     file(qc_file)
 
     output:
-    file('QC_Stats_Final_HCvcf.xlsx')
+    file('QC_Stats_Final.xlsx')
 
     script:
     """
     zcat $vcfgz | add_sample_count_to_cohort_vcf.py > cohort_vcf_with_count_column.tsv
     # add it to the QC report now
-    add_cohort_vcf_to_qc.py $qc_file cohort_vcf_with_count_column.tsv
+    add_cohort_vcf_to_qc.py $qc_file cohort_vcf_with_count_column.tsv Cohort_VCF
+    """
+}
+
+process add_cohort_CNVs_to_qc_report{
+    tag {idPatient + "-" + idSample}
+    label 'container_container_py3_pandas'
+
+    publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
+
+    input:
+    file(vcf)
+    file(qc_file)
+
+    output:
+    file('QC_Stats_Final.xlsx')
+
+    script:
+    """
+    zcat $vcf | add_sample_count_to_cohort_vcf.py > cohort_vcf_with_count_column.tsv
+    # add it to the QC report now
+    add_cohort_vcf_to_qc.py $qc_file cohort_vcf_with_count_column.tsv Merged_CNV
     """
 }
