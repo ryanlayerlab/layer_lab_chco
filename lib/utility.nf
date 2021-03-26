@@ -389,7 +389,8 @@ def defineStepList() {
         'recalibrate',
         'variantcalling',
         'joint_genotype',
-        'annotate'
+        'annotate',
+        'qc'
     ]
 }
 

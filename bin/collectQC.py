@@ -40,14 +40,11 @@ def excelAutofit(df,name,writer,pcts=[],dec=[],hidden=[],max_width=60):
     return writer
 
 
-print(sys.argv)
-
 samples = pd.read_csv(sys.argv[1],sep='\t',header=None, names=['subject','sex','status','sample','lane','fastq1','fastq2'])
 res_dir = sys.argv[2]
 
 a=sys.argv[3]
 res_dir='/'.join(a.split('/')[:a.split('/').index('work')]) + '/' + res_dir
-print(res_dir)
 
 # if there is a trailing /, remove it
 if res_dir[-1] == '/':
@@ -94,8 +91,6 @@ for subject in samples.subject.unique():
             """ BCFTools Metrics """
             # get the first dir of a variant caller
             filename = find_bcf_tools_stats_out(res_dir + '/QC/{}/BCFTools'.format(sample))
-            print('-------')
-            print(filename)
             bcftools = pd.read_csv(filename,delimiter='\t',skiprows=21,nrows=9)
             """ Variant Duplicates """
             #filename =
@@ -107,9 +102,6 @@ for subject in samples.subject.unique():
             #    print('ELSE')
             #    bcftools = pd.DataFrame({'[3]key':['number of records:','number of SNPs:'],'[4]value':[None,None]})
             """ Appending relevant info to dataframe... """
-            print('blahhhhh')
-            print(bcftools.loc[bcftools['[3]key'] == 'number of records:','[4]value'].values[0])
-            print(bcftools.loc[bcftools['[3]key'] == 'number of SNPs:','[4]value'].values[0])
             dna_qc = dna_qc.append(pd.DataFrame({'Specimen ID':[subject],\
             'Micronic ID':[sample.split('_')[0]],'Pass QC (Y/N)':'N',\
             'Fingerprint':fp.Fingerprint.values,'Total Reads':raw.TOTAL_READS.values,\

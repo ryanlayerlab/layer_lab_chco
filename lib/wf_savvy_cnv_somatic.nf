@@ -7,6 +7,8 @@ workflow wf_savvy_cnv_somatic{
     /* MarkDuplicates.out.marked_bams => [idPatient, idSample, md.bam, md.bam.bai]*/
     SavvyCNVCoverageSummary(_bam_recal)
     SavvyCNV(SavvyCNVCoverageSummary.out.collect())
+    emit:
+    savvy_output = SavvyCNV.out
 } // end of wf_germline_cnv
 
 
@@ -14,9 +16,8 @@ workflow wf_savvy_cnv_somatic{
 
 process SavvyCNVCoverageSummary {
     label 'container_llab'
-   label 'cpus_16'
+    label 'cpus_16'
     tag "${idSample}"
-    cache false
     // publishDir "${params.outdir}/VariantCalling/${idSample}/SavvycnvCoverageSummary", mode: params.publish_dir_mode
     
     input:
