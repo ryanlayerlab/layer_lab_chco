@@ -25,7 +25,7 @@ workflow wf_build_indexes{
         fasta_gz_fai = params.fasta_gz_fai ? Channel.value(file(params.fasta_gz_fai)) : BuildFastaGzFai.out
         fasta_gzi = params.fasta_gzi ? Channel.value(file(params.fasta_gzi)) : BuildFastaGzi.out
         bwa_index = params.bwa_index ? Channel.value(file(params.bwa_index)) : BuildBWAindexes.out
-        dict = params. dict ? Channel.value(file(params.dict)) :  BuildDict.out
+        dict = params.dict ? Channel.value(file(params.dict)) :  BuildDict.out
 
         dbsnp_index = params.dbsnp ? \
                         params.dbsnp_index ? Channel.value(file(params.dbsnp_index)) \
