@@ -245,7 +245,7 @@ process add_cohort_CNVs_to_qc_report{
 
     script:
     """
-    zcat $vcf | add_sample_count_to_cohort_vcf.py > cohort_vcf_with_count_column.tsv
+    cat $vcf | add_sample_count_to_cohort_vcf.py > cohort_vcf_with_count_column.tsv
     # add it to the QC report now
     add_cohort_vcf_to_qc.py $qc_file cohort_vcf_with_count_column.tsv Merged_CNV
     """
