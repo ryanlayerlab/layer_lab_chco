@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 import pandas as pd
 import sys
-bed = pd.read_csv(sys.argv[1],sep='\t',header=None)
-
+try:
+    bed = pd.read_csv(sys.argv[1],sep='\t',header=None)
+except pd.errors.EmptyDataError:
+   # there are no lines in the file, output anything and quit
+   print()
+   quit()
 names = ['chr', 'start', 'end', 'gene', 'exons', 'copy_number', 'genotype', 'genotype_quality', 'sample','caller','cluster']
 bed.columns = names
 

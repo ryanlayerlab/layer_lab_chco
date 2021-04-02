@@ -40,7 +40,9 @@ for line in open(vcf_file,'r'):
 names[-1] = 'count'
 vcf.columns = names
 
-writer = pd.ExcelWriter('QC_Stats_Final.xlsx', engine='xlsxwriter')
+# take the input file name and append the current tab to the end of the file name
+outfile_name = qc_file.split('.')[0] + '_' + tab_name + '.' + qc_file.split('.')[1]
+writer = pd.ExcelWriter(outfile_name, engine='xlsxwriter')
 writer = excelAutofit(df, 'DNA Overview', writer, \
                       pcts=['% Dups', '%20x', '%50x', '%100x', '% Quality', '% On Target', 'sex'])
 writer.sheets['DNA Overview'].freeze_panes(1, 2)

@@ -188,7 +188,7 @@ process collectQC{
 }
 
 process add_somalier_to_QC{
-    label 'container_container_py3_pandas'
+    label 'container_py3_pandas'
     publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
 
     input:
@@ -211,7 +211,7 @@ process add_somalier_to_QC{
 
 process add_cohort_vc_to_qc_report{
     tag {idPatient + "-" + idSample}
-    label 'container_container_py3_pandas'
+    label 'container_py3_pandas'
 
     publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
 
@@ -232,7 +232,7 @@ process add_cohort_vc_to_qc_report{
 
 process add_cohort_CNVs_to_qc_report{
     tag {idPatient + "-" + idSample}
-    label 'container_container_py3_pandas'
+    label 'container_py3_pandas'
 
     publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
 

@@ -4,7 +4,7 @@ logs/
 nf_reports/
 analysis/
 results/
-Makefile*
+*Makefile*
 .nextflow/
 .nextflow.log*
 *.bed

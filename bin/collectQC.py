@@ -74,7 +74,7 @@ for subject in samples.subject.unique():
                 fp.Fingerprint = fp.Fingerprint.values[0][:-3] + '_01'
             else:
                 fp.Fingerprint = fp.Fingerprint.values[0][:-3] + '_--'
-            fp['Specimen ID'] = subject
+            fp['Specimen ID'] = sample
             fp['Micronic ID'] = sample.split('_')[0]
             fp['SNP'] = fp['Chromo'].astype(str) + ':' + fp['Start_Pos'].astype(str) + \
             ':' + fp['End_Pos'].astype(str) + ':' + fp['Minor'] + ':' + fp['Major']
@@ -102,7 +102,7 @@ for subject in samples.subject.unique():
             #    print('ELSE')
             #    bcftools = pd.DataFrame({'[3]key':['number of records:','number of SNPs:'],'[4]value':[None,None]})
             """ Appending relevant info to dataframe... """
-            dna_qc = dna_qc.append(pd.DataFrame({'Specimen ID':[subject],\
+            dna_qc = dna_qc.append(pd.DataFrame({'Specimen ID':[sample],\
             'Micronic ID':[sample.split('_')[0]],'Pass QC (Y/N)':'N',\
             'Fingerprint':fp.Fingerprint.values,'Total Reads':raw.TOTAL_READS.values,\
             '% Quality':float(final.TOTAL_READS.values)/raw.TOTAL_READS.values,\
@@ -128,7 +128,7 @@ for subject in samples.subject.unique():
             for val in tempData.read().split('\n') if '|' in val}
             tempData.close()
             """ Appending relevant info to dataframe... """
-            rna_qc = rna_qc.append(pd.DataFrame({'Specimen ID':[subject],\
+            rna_qc = rna_qc.append(pd.DataFrame({'Specimen ID':[sample],\
             'Micronic ID':[sample.split('_')[0]],'Pass QC (Y/N)':'N',\
             'Total Reads':rnaseq.CORRECT_STRAND_READS.values,\
             '% Aligned Bases':rnaseq.PF_ALIGNED_BASES.values/rnaseq.PF_BASES.values,\
