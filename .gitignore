@@ -11,3 +11,5 @@ results/
 *vcf
 *bed
 *Makefile*
+.idea/
+*xlsx
