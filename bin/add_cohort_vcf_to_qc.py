@@ -23,10 +23,17 @@ def excelAutofit(df, name, writer, pcts=[], dec=[], hidden=[], max_width=60):
 qc_file = sys.argv[1]
 vcf_file = sys.argv[2]
 tab_name = sys.argv[3]
-# qc_file = 'Data/QC_Stats_Final.xlsx'
-# vcf_file = 'cohort_vcf.tsv'
+# qc_file = 'QC_Stats_Final.xlsx'
+# vcf_file = '/Users/michael/Downloads/cohort_vcf_with_count_column.tsv'
+# tab_name = 'Cohort_VCF'
 
-df = pd.read_excel(qc_file, engine='openpyxl')
+xls = pd.ExcelFile(qc_file)
+sheets = []
+for sheet_name in xls.sheet_names:
+    df = pd.read_excel(xls, sheet_name)
+    sheets.append(df)
+
+df = sheets[0]
 vcf = pd.read_csv(vcf_file, sep='\t', comment='#')
 
 names = None
@@ -47,7 +54,10 @@ writer = excelAutofit(df, 'DNA Overview', writer, \
                       pcts=['% Dups', '%20x', '%50x', '%100x', '% Quality', '% On Target', 'sex'])
 writer.sheets['DNA Overview'].freeze_panes(1, 2)
 
+for i in range(1, len(xls.sheet_names)):
+    sheets[i].to_excel(writer, sheet_name=xls.sheet_names[i])
+
 vcf.to_excel(writer, sheet_name=tab_name)
 
 writer.save()
-writer.close()
+
