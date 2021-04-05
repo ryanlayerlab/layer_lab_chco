@@ -7,3 +7,7 @@ results/
 Makefile
 .nextflow/
 .nextflow.log*
+*tsv
+*vcf
+*bed
+*Makefile*
