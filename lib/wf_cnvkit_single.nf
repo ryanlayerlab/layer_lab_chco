@@ -1,7 +1,7 @@
 tools = params.globals.tools
 workflow wf_cnvkit_single{
     take: _md_bam_collected
-    take: _target_bed
+    take: _cnv_target_bed
     take: _fasta
     take: _fasta_fai
     take: _cnvkit_ref
@@ -13,8 +13,8 @@ workflow wf_cnvkit_single{
         //     _md_bam_collected,
         //     _fasta,
         //     _target_bed)
-        PrepareTargets(_target_bed)
-        PrepareAntiTargets(_target_bed)
+        PrepareTargets(_cnv_target_bed)
+        PrepareAntiTargets(_cnv_target_bed)
         _cnvkit_targets = PrepareTargets.out
         _cnvkit_antitargets = PrepareAntiTargets.out
         _ref = _cnvkit_ref
@@ -59,7 +59,7 @@ process PrepareTargets{
     output:
     file("cnvkit_targets.bed")
 
-    when: 'cnvkit_single' in tools
+    when: ('cnvkit_single' in tools ) || ('cnvkit_gen_ref' in tools )  
 
     script:
     
@@ -85,7 +85,7 @@ process PrepareAntiTargets{
     output:
     file("cnvkit_antitargets.bed")
 
-    when: 'cnvkit_single' in tools
+    when: ('cnvkit_single' in tools ) || ('cnvkit_gen_ref' in tools )  
 
     script:
     
@@ -135,7 +135,7 @@ process SampleTargetCoverage{
     //tuple idPatient, idSample, file("${idSample}.targetcoverage.cnn"), file("${idSample}.antitargetcoverage.cnn")
     tuple idPatient, idSample, file("${idSample}.targetcoverage.cnn")
 
-    when: 'cnvkit_single' in tools
+    when: ('cnvkit_single' in tools ) || ('cnvkit_gen_ref' in tools )  
 
     script:
     
@@ -159,7 +159,7 @@ process SampleAntiTargetCoverage{
     output:
     tuple idPatient, idSample, file("${idSample}.antitargetcoverage.cnn")
 
-    when: 'cnvkit_single' in tools
+   when: ('cnvkit_single' in tools ) || ('cnvkit_gen_ref' in tools )  
 
     script:
     

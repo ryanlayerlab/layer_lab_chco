@@ -50,6 +50,7 @@ toolList = defineToolList()
 tools = params.tools ? params.tools.split(',').collect{it.trim().toLowerCase()} : []
 if (!checkParameterList(tools, toolList)) exit 1, 'Unknown tool(s), see --help for more information'
 params.globals.tools = tools 
+// error "Current tools are ${params.globals.tools}"
 // Check if bm_dv_against_gatk selected, but deepvariant and haplotypecaller are not in the tools list
 // if ( ('benchmark_dv_against_hc' in tools) && (!('haplotypecaller' in tools) || !('deepvariant' in tools) ) ) {
 //     exit 1, "When benchmark_dv_against_hc selected, both HaplotypeCaller and DeepVariant needs to be in the tools list"
@@ -191,6 +192,7 @@ ch_read_count_pon = params.read_count_pon ? Channel.value(file(params.read_count
 ch_somatic_pon = params.somatic_pon ? Channel.value(file(params.somatic_pon)) : "null"
 ch_somatic_pon_index = params.somatic_pon_index ? Channel.value(file(params.somatic_pon_index)) : "null"
 ch_target_bed = params.target_bed ? Channel.value(file(params.target_bed)) : "null"
+ch_cnv_target_bed = params.cnv_target_bed ? Channel.value(file(params.cnv_target_bed)) : "null"
 // padded target, if specified also generate CollectHsMetrics for the recal bams intersected with the padded bed
 ch_padded_target_bed = params.padded_target_bed ? Channel.value(file(params.padded_target_bed)) : "null"
 ch_bait_bed = params.bait_bed ? Channel.value(file(params.bait_bed)) : "null"
@@ -223,6 +225,10 @@ ch_cadd_InDels_tbi = params.cadd_InDels_tbi ? Channel.value(file(params.cadd_InD
 ch_cadd_WG_SNVs = params.cadd_WG_SNVs ? Channel.value(file(params.cadd_WG_SNVs)) : "null"
 ch_cadd_WG_SNVs_tbi = params.cadd_WG_SNVs_tbi ? Channel.value(file(params.cadd_WG_SNVs_tbi)) : "null"
 ch_cnvkit_ref = params.cnvkit_ref ? Channel.value(file(params.cnvkit_ref)) : "null"
+ch_savvy_controls_dir = params.savvy_controls_dir ? Channel.value(file(params.savvy_controls_dir)) : "null"
+ch_gcnv_contig_ploidy_priors = params.gcnv_contig_ploidy_priors ? Channel.value(file(params.gcnv_contig_ploidy_priors)) : "null"
+ch_gcnv_ploidy_model = params.gcnv_ploidy_model ? Channel.value(file(params.gcnv_ploidy_model)) : "null"
+ch_gcnv_cohort_model = params.gcnv_cohort_model ? Channel.value(file(params.gcnv_cohort_model)) : "null"
 
 // Optional CHCO files for calculating TP, FP, TN etc against the GIAB
 ch_giab_highconf_vcf = params.giab_highconf_vcf ? Channel.value(file(params.giab_highconf_vcf)) : "null"
@@ -266,9 +272,11 @@ include {wf_haplotypecaller} from './lib/wf_haplotypecaller'
 include {wf_individually_genotype_gvcf} from './lib/wf_individually_genotype_gvcf' 
 include {wf_jointly_genotype_gvcf} from './lib/wf_jointly_genotype_gvcf' 
 include {wf_gatk_cnv_somatic} from './lib/wf_gatk_cnv_somatic' 
+include {wf_gatk_gcnv} from './lib/wf_gatk_gcnv' 
 include {wf_savvy_cnv_somatic} from './lib/wf_savvy_cnv_somatic' 
 include {wf_cnvkit_somatic} from './lib/wf_cnvkit_somatic' 
 include {wf_cnvkit_single} from './lib/wf_cnvkit_single' 
+include {wf_cnvkit_gen_ref} from './lib/wf_cnvkit_gen_ref' 
 include {wf_manta_single} from './lib/wf_manta_single' 
 include {wf_vcf_stats} from './lib/wf_vcf_stats' 
 include {wf_multiqc} from './lib/wf_multiqc' 
@@ -326,6 +334,7 @@ workflow{
                                 ch_bwa_index,
                                 '')
         ch_bam_mapped = wf_gather_mapped_partial_reads.out.bams_mapped
+        ch_bam_for_cnv = ch_bam_mapped
         // Now we check if we need to filter the bams
         if (params.filter_bams ){
             // In this case we'll use the filtered bams for most downstream analyses
@@ -340,7 +349,8 @@ workflow{
             // we keep them aside but only after duplcate marking
             wf_mark_duplicates_raw_bams(ch_bam_mapped)
             ch_bam_mapped_raw = wf_mark_duplicates_raw_bams.out.dm_bams
-            ch_bam_for_cnv = ch_bam_mapped_raw
+            // ch_bam_for_cnv = ch_bam_mapped_raw
+            // ch_bam_for_cnv.dump('bams_for_cnv: ')
             ch_bam_mapped = wf_filter_and_gather_mapped_partial_reads.out
         }
             
@@ -437,7 +447,7 @@ c) recalibrated bams
        ch_dup_marked_raw = recalibrated_bam_to_marked_dup_bams.out
     } else{
         ch_bam_for_vc = ch_bam_recal
-
+        ch_bam_for_cnv = ch_bam_marked
     }
 
         
@@ -591,7 +601,8 @@ c) recalibrated bams
         ch_read_count_pon
     )
     
-    wf_savvy_cnv_somatic(ch_bam_for_vc)
+    wf_savvy_cnv_somatic(ch_bam_for_vc,
+                         ch_savvy_controls_dir)
     
     (ch_normal_md_bam, ch_tumor_md_bam) = 
         ch_bam_for_vc.branch{
@@ -628,13 +639,32 @@ c) recalibrated bams
                     ch_fasta,
                     ch_fasta_fai
                     )
+    if('cnvkit_gen_ref' in tools ){
+        wf_cnvkit_gen_ref(
+                        ch_bam_for_cnv,
+                        ch_cnv_target_bed,
+                        ch_fasta,
+                        ch_fasta_fai
+                        )
+    }
+
     wf_cnvkit_single(
                     ch_bam_for_cnv,
-                    ch_target_bed,
+                    ch_cnv_target_bed,
                     ch_fasta,
                     ch_fasta_fai,
                     ch_cnvkit_ref
                     )
+    wf_gatk_gcnv(
+        ch_bam_for_cnv,
+        ch_cnv_target_bed,
+        ch_fasta,
+        ch_fasta_fai,
+        ch_dict,
+        ch_gcnv_contig_ploidy_priors,
+        ch_gcnv_ploidy_model,
+        ch_gcnv_cohort_model
+    )
     // wf_cnvkit_cnv(
     //     ch_bams.collect(),
     //     ch_fasta,

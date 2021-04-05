@@ -106,7 +106,10 @@ process PreprocessIntervals {
         file("preprocessed_intervals.interval_list")
 
     // when: ('gatk_cnv_somatic' in tools) || ('gen_read_count_pon' in tools)
-    when: ('gatk_cnv_somatic' in tools)
+    when: ('gatk_cnv_somatic' in tools ||
+           'gatk_cnv_germline_cohort_mode' in tools ||
+           'gatk_cnv_germline' in tools
+           )
     
     script:
     intervals_options = params.no_intervals ? "" : "-L ${intervalBed}"
@@ -137,7 +140,10 @@ process CollectReadCounts {
     output:
         tuple idPatient, idSample, file("${idSample}.counts.hdf5"), emit: 'sample_read_counts'
 
-    when: ('gatk_cnv_somatic' in tools)
+    when: ('gatk_cnv_somatic' in tools ||
+           'gatk_cnv_germline_cohort_mode' in tools ||
+           'gatk_cnv_germline' in tools
+           )
 
     script:
     """
