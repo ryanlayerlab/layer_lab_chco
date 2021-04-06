@@ -35,9 +35,9 @@ process savvy_to_bed{
 
     script:
     """
-    # the file is hard coded for now, change before going live to $SavvycnvResults/cnv_list.csv
+    # the file is hard coded for now, change before going live to $SavvycnvResults/cnv_list.csv /scratch/Shares/CHCO/workspace/cna_positive_wes/results/savvycnv/VariantCalling/SavvycnvResults/cnv_list.csv
     # remove chr from chromosome
-    cat /scratch/Shares/CHCO/workspace/cna_positive_wes/results/savvycnv/VariantCalling/SavvycnvResults/cnv_list.csv | sed 's/chr//g' | bedtools intersect -wb -a $exon_file -b stdin > savvy-temp.tsv
+    cat $SavvycnvResults/cnv_list.csv | sed 's/chr//g' | bedtools intersect -wb -a $exon_file -b stdin > savvy-temp.tsv
     savvy_to_bed.py savvy-temp.tsv 
     ls
     """

@@ -685,7 +685,7 @@ c) recalibrated bams
     //     wf_jointly_genotype_gvcf.out.vcfs_with_indexes
     //     )
     wf_vcf_stats(wf_deepvariant.out.vcf,
-        wf_jointly_genotype_gvcf.out.vcf_with_index
+        wf_individually_genotype_gvcf.out.sample_vcf_HC 
         )
 
     wf_multiqc(
