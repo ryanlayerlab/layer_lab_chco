@@ -94,7 +94,7 @@ for subject in samples.subject.unique():
             bcftools = pd.read_csv(filename,delimiter='\t',skiprows=21,nrows=9)
             """ Variant Duplicates """
             #filename =
-            vcf = pd.read_csv(res_dir + '/VariantCalling/{}/HC_jointly_genotyped_vcf/{}.vcf.gz'.format(sample,sample),\
+            vcf = pd.read_csv(res_dir + '/VariantCalling/{}/HC_individually_genotyped_vcf/HC{}.vcf.gz'.format(sample,sample),\
             delimiter='\t',comment='#',usecols=[ind for ind in range(9)],\
             names=['CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT'])
             variants = variants.append(vcf,ignore_index=True,sort=False)
