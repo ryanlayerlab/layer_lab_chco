@@ -220,7 +220,7 @@ process add_cohort_vc_to_qc_report{
     file(qc_file)
 
     output:
-    file('QC_Stats_Final.xlsx')
+    file('QC_Stats_*.xlsx')
 
     script:
     """
@@ -241,7 +241,7 @@ process add_cohort_CNVs_to_qc_report{
     file(qc_file)
 
     output:
-    file('QC_Stats_Final.xlsx')
+    file('QC_Stats*.xlsx')
 
     script:
     """

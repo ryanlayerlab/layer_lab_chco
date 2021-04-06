@@ -355,6 +355,10 @@ workflow{
         }
             
         ch_fastqc_report = wf_fastqc_fq.out.fastqc_reports.collect()
+    }else{
+        //mark raw bams, used for exon coverage qc
+        wf_mark_duplicates_raw_bams(ch_bam_mapped)
+        ch_bam_mapped_raw = wf_mark_duplicates_raw_bams.out.dm_bams
     } 
 
     // If the pipeline is being started from the step 'markdups'
@@ -701,10 +705,12 @@ c) recalibrated bams
      onTarget(ch_bam_for_vc,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_padded_target_bed)
      
      if (step == 'qc'){
-         ch_bam_mapped = ch_dup_marked_raw
+         ch_marked_raw = ch_dup_marked_raw
+     }else{
+         ch_marked_raw = ch_bam_mapped_raw
      }
      
-     wf_raw_bam_exonCoverage(ch_bam_mapped,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
+     wf_raw_bam_exonCoverage(ch_marked_raw,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
      insertSize(ch_bam_for_vc)
      wf_qc_fingerprinting_sites(ch_bam_for_vc,qc_extra_finger_print_sites)
      dnaFingerprint(ch_bam_for_vc,qc_finger_print_sites,"Normal")
