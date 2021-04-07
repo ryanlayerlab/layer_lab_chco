@@ -74,8 +74,8 @@ for subject in samples.subject.unique():
                 fp.Fingerprint = fp.Fingerprint.values[0][:-3] + '_01'
             else:
                 fp.Fingerprint = fp.Fingerprint.values[0][:-3] + '_--'
-            fp['Specimen ID'] = sample
-            fp['Micronic ID'] = sample.split('_')[0]
+            fp['Specimen ID'] = subject
+            fp['Micronic ID'] = sample
             fp['SNP'] = fp['Chromo'].astype(str) + ':' + fp['Start_Pos'].astype(str) + \
             ':' + fp['End_Pos'].astype(str) + ':' + fp['Minor'] + ':' + fp['Major']
             fp = fp.groupby(['Specimen ID','Micronic ID','Fingerprint','SNP'],sort=False).AF.sum().unstack().reset_index()
@@ -90,8 +90,7 @@ for subject in samples.subject.unique():
             #if samples.loc[(samples['subject'] == subject) & (samples['sample'] == sample),'status'].values[0] == 1:
             """ BCFTools Metrics """
             # get the first dir of a variant caller
-            filename = find_bcf_tools_stats_out(res_dir + '/QC/{}/BCFTools'.format(sample))
-            bcftools = pd.read_csv(filename,delimiter='\t',skiprows=21,nrows=9)
+            bcftools = pd.read_csv(res_dir + '/Reports/{}/BCFToolsStats/HaplotypeCaller_Individually_Genotyped/HC{}.bcf.tools.stats.out'.format(sample,sample),delimiter='\t',skiprows=21,nrows=9)
             """ Variant Duplicates """
             #filename =
             vcf = pd.read_csv(res_dir + '/VariantCalling/{}/HC_individually_genotyped_vcf/HC{}.vcf.gz'.format(sample,sample),\
@@ -102,8 +101,8 @@ for subject in samples.subject.unique():
             #    print('ELSE')
             #    bcftools = pd.DataFrame({'[3]key':['number of records:','number of SNPs:'],'[4]value':[None,None]})
             """ Appending relevant info to dataframe... """
-            dna_qc = dna_qc.append(pd.DataFrame({'Specimen ID':[sample],\
-            'Micronic ID':[sample.split('_')[0]],'Pass QC (Y/N)':'N',\
+            dna_qc = dna_qc.append(pd.DataFrame({'Specimen ID':[subject],\
+            'Micronic ID':[sample],'Pass QC (Y/N)':'N',\
             'Fingerprint':fp.Fingerprint.values,'Total Reads':raw.TOTAL_READS.values,\
             '% Quality':float(final.TOTAL_READS.values)/raw.TOTAL_READS.values,\
             'Mean Target Coverage':final.MEAN_TARGET_COVERAGE.values,\
@@ -128,8 +127,8 @@ for subject in samples.subject.unique():
             for val in tempData.read().split('\n') if '|' in val}
             tempData.close()
             """ Appending relevant info to dataframe... """
-            rna_qc = rna_qc.append(pd.DataFrame({'Specimen ID':[sample],\
-            'Micronic ID':[sample.split('_')[0]],'Pass QC (Y/N)':'N',\
+            rna_qc = rna_qc.append(pd.DataFrame({'Specimen ID':[subject],\
+            'Micronic ID':[sample],'Pass QC (Y/N)':'N',\
             'Total Reads':rnaseq.CORRECT_STRAND_READS.values,\
             '% Aligned Bases':rnaseq.PF_ALIGNED_BASES.values/rnaseq.PF_BASES.values,\
             '% mRNA Bases':rnaseq.PCT_MRNA_BASES.values,\

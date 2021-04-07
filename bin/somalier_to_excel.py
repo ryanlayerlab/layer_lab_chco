@@ -64,7 +64,7 @@ for family in relations:
 
 # collected the predicted sex of each sample
 sexes = []
-for samp in df['Specimen ID'].unique():
+for samp in df['Micronic ID'].unique():
     try:
         x_het = int(df_samples[df_samples['sample_id'] == samp]['X_het'])
     except TypeError:
@@ -79,7 +79,7 @@ df['sex'] = sexes
 
 # collected the predicted sex of each sample
 unknown_counts = []
-for samp in df['Specimen ID'].unique():
+for samp in df['Micronic ID'].unique():
     unknown_counts.append(list(df_samples[df_samples['sample_id'] == samp]['n_unknown'])[0])
 
 df['num_unknown_sites'] = unknown_counts
@@ -129,38 +129,41 @@ for i in range(df_pairs.shape[0]):
 # expected relationships is the size of the intersection of samples listed as being related in the manifest and those numberically predicted to be related in somalier
 df['relatedness_expected'] = [
     len(set(samples_related_dict[x]).intersection(set(redundant_relations[x]))) if x in samples_related_dict else 'N/A'
-    for x in list(df['Specimen ID'])]
+    for x in list(df['Micronic ID'])]
 df['ibs0_expected'] = [
     len(set(samples_ibs0_dict[x]).intersection(set(redundant_relations[x]))) if x in samples_ibs0_dict else 'N/A' for x
-    in list(df['Specimen ID'])]
+    in list(df['Micronic ID'])]
 df['ibs2_expected'] = [
     len(set(samples_ibs2_dict[x]).intersection(set(redundant_relations[x]))) if x in samples_ibs2_dict else 'N/A' for x
-    in list(df['Specimen ID'])]
+    in list(df['Micronic ID'])]
 
 # unexpected relationships are those not listed in the manifest file but predicted to be related by somalier
 df['relatedness_unexpected'] = [
     len([y for y in samples_related_dict[x] if y not in redundant_relations[x]]) if x in samples_related_dict else 'N/A'
-    for x in list(df['Specimen ID'])]
+    for x in list(df['Micronic ID'])]
 df['ibs0_unexpected'] = [
     len([y for y in samples_ibs0_dict[x] if y not in redundant_relations[x]]) if x in samples_ibs0_dict else 'N/A' for x
-    in list(df['Specimen ID'])]
+    in list(df['Micronic ID'])]
 df['ibs2_unexpected'] = [
     len([y for y in samples_ibs2_dict[x] if y not in redundant_relations[x]]) if x in samples_ibs2_dict else 'N/A' for x
-    in list(df['Specimen ID'])]
+    in list(df['Micronic ID'])]
 
 # list the sample names for the unexpected relationships
 df['relatedness_unexpected_names'] = [';'.join(
     [y for y in samples_related_dict[x] if y not in redundant_relations[x]]) if x in samples_related_dict else 'N/A' for
-                                      x in list(df['Specimen ID'])]
+                                      x in list(df['Micronic ID'])]
 df['ibs0_unexpected_names'] = [
     ';'.join([y for y in samples_ibs0_dict[x] if y not in redundant_relations[x]]) if x in samples_ibs0_dict else 'N/A'
-    for x in list(df['Specimen ID'])]
+    for x in list(df['Micronic ID'])]
 df['ibs2_unexpected_names'] = [
     ';'.join([y for y in samples_ibs2_dict[x] if y not in redundant_relations[x]]) if x in samples_ibs2_dict else 'N/A'
-    for x in list(df['Specimen ID'])]
+    for x in list(df['Micronic ID'])]
 
 # write the first tab that has been augmented with somalier
 writer = pd.ExcelWriter('QC_Stats_Final.xlsx', engine='xlsxwriter')
+
+# remove everything but portion after the last '_'. This is what the actual Micronic ID is, prior to this is was needed for sample name matching 
+df['Micronic ID'] = [ x.split('_')[-1] for x in df['Micronic ID']]
 writer = excelAutofit(df, 'DNA Overview', writer,
                       pcts=['% Dups', '%20x', '%50x', '%100x', '% Quality', '% On Target', 'sex'])
 writer.sheets['DNA Overview'].freeze_panes(1, 2)

@@ -161,6 +161,8 @@ process collectQC{
     publishDir "${params.outdir}/Reports/${idSample}/FingerPrinting/", mode: params.publish_dir_mode
     publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
 
+    cache false
+
     input:
     file(sample_file)
     file(results_dir)
