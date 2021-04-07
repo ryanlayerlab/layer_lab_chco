@@ -40,7 +40,8 @@ workflow wf_individually_genotype_gvcf{
         //         ConcatVCF.out.concatenated_vcf_without_index
         //         )
     emit:
-        sample_vcf_HC = IndividuallyGentoypeGVCF.out.vcf_HaplotypeCaller
+        sample_vcf_HC = ConcatVCF.out.concatenated_vcf_with_index
+        //sample_vcf_HC = IndividuallyGentoypeGVCF.out.vcf_HaplotypeCaller
         // sample_vcf_HC = GvcfToVcf.out.vcf_HaplotypeCaller
 }
 
@@ -58,7 +59,7 @@ process IndividuallyGentoypeGVCF{
         file(dbsnp)
         file(dbsnpIndex)
     output:
-        // tuple val('HaplotypeCaller_Individually_Genotyped'), idPatient, idSample, file("${gvcf.simpleName}.vcf"), emit: vcf_HaplotypeCaller
+        //tuple val('HaplotypeCaller_Individually_Genotyped'), idPatient, idSample, file("${gvcf.simpleName}.vcf"), file("${gvcf.simpleName}.vcf.tbi"), emit: vcf_HaplotypeCaller
         tuple idPatient, idSample, file(out_file), emit: vcf_HaplotypeCaller
 
     when: 'haplotypecaller' in tools

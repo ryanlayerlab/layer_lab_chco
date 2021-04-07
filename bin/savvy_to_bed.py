@@ -28,8 +28,12 @@ def get_exon_numbers(items):
 # outfile = 'savvy_test1.bed'
 # overlap = pd.read_csv('Data/del.txt', sep='\t', header=None)
 
-
-overlap = pd.read_csv(sys.argv[1], sep='\t')
+try:
+    overlap = pd.read_csv(sys.argv[1], sep='\t')
+except pd.errors.EmptyDataError:
+    f = open( 'no_calls_from_savvy.bed','w')
+    f.close()
+    quit()
 
 names = ['bed_chr', 'bed_start', 'bed_end', 'bed_info', 'bed_unknown', 'bed_strand', 'savvy_chr', 'savvy_start',
          'savvy_end', 'savvy_svtype', 'savvy_#_of_chunks', 'savvy_width_of_chunks', 'savvy_phred',

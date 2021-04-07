@@ -6,8 +6,6 @@ process exonCoverage{
     publishDir "${params.outdir}/Reports/${idSample}/exonCoverage/", mode: params.publish_dir_mode
     publishDir "${params.outdir}/QC/${idSample}/exonCoverage", mode: params.publish_dir_mode
 
-    cache false
-
     input:
     tuple idPatient, idSample, file(bam), file(bai)
     // tuple idPatient, idSample, file(bam)
@@ -162,8 +160,6 @@ process collectQC{
     label 'container_py3_pandas'
     publishDir "${params.outdir}/Reports/${idSample}/FingerPrinting/", mode: params.publish_dir_mode
     publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
-
-    cache false
 
     input:
     file(sample_file)

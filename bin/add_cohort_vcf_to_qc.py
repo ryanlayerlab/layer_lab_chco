@@ -44,10 +44,12 @@ for line in open(vcf_file,'r'):
     else:
         break
 
-names[-1] = 'count'
-vcf.columns = names
+# error handling for if the vcf if empty
+if names is not None:
+    names[-1] = 'count'
+    vcf.columns = names
 
-# take the input file name and append the current tab to the end of the file name
+    # take the input file name and append the current tab to the end of the file name
 outfile_name = qc_file.split('.')[0] + '_' + tab_name + '.' + qc_file.split('.')[1]
 writer = pd.ExcelWriter(outfile_name, engine='xlsxwriter')
 writer = excelAutofit(df, 'DNA Overview', writer, \
@@ -57,7 +59,11 @@ writer.sheets['DNA Overview'].freeze_panes(1, 2)
 for i in range(1, len(xls.sheet_names)):
     sheets[i].to_excel(writer, sheet_name=xls.sheet_names[i])
 
-vcf.to_excel(writer, sheet_name=tab_name)
+# error handling for if the vcf if empty
+if names is not None:
+    vcf.to_excel(writer, sheet_name=tab_name)
+else:
+    pd.DataFrame({'No information reported':[]}).to_excel(writer, sheet_name=tab_name)
 
 writer.save()
 

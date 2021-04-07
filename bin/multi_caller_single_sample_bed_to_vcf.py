@@ -227,8 +227,11 @@ if __name__ == '__main__':
     # example_vcf = 'Data/genome_proband_Fabric.vcf'
     # reference_fasta = 'Ref/human_g1k_v37.fasta'
     # bed_file = 'Data/aggregated_multi_sample_multi_caller.bed'
-
-    bed_dict = get_bed_for_each_sample(bed_file)
+    try:
+        bed_dict = get_bed_for_each_sample(bed_file)
+    except pd.errors.EmptyDataError:
+        print()
+        quit()
     ref = pysam.FastaFile(reference_fasta)
     files = []
     keys = list(bed_dict.keys())  # keys are sample names
