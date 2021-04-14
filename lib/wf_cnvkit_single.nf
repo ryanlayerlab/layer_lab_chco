@@ -43,7 +43,7 @@ workflow wf_cnvkit_single{
         Scatter(Segment.out[1])
         // Diagram(Segment.out[1])
     emit:
-    cnr_tuple = FixForBiases.out
+    cns_tuple = CallSegment.out
 } // end of wf_germline_cnv
 
 process PrepareTargets{

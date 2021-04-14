@@ -160,7 +160,7 @@ df['ibs2_unexpected_names'] = [
     for x in list(df['Micronic ID'])]
 
 # write the first tab that has been augmented with somalier
-writer = pd.ExcelWriter('QC_Stats_Final.xlsx', engine='xlsxwriter')
+writer = pd.ExcelWriter('QC_Stats_Somalier.xlsx', engine='xlsxwriter')
 
 # remove everything but portion after the last '_'. This is what the actual Micronic ID is, prior to this is was needed for sample name matching 
 df['Micronic ID'] = [ x.split('_')[-1] for x in df['Micronic ID']]
@@ -174,8 +174,8 @@ writer = excelAutofit(sheets[1][sheets[1].columns[:100]], 'DNA Fingerprints', wr
                             col not in ['Specimen ID', 'Micronic ID', 'Fingerprint']])
 writer.sheets['DNA Fingerprints'].freeze_panes(1, 2)
 
-writer = excelAutofit(sheets[2], 'DNA Variant Dups', writer, max_width=30)
-writer.sheets['DNA Variant Dups'].freeze_panes(1, 0)
+#writer = excelAutofit(sheets[2], 'DNA Variant Dups', writer, max_width=30)
+#writer.sheets['DNA Variant Dups'].freeze_panes(1, 0)
 
 # save the xlsx file
 writer.save()

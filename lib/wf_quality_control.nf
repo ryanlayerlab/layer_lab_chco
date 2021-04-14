@@ -202,7 +202,7 @@ process add_somalier_to_QC{
     when: ! ('chco_qc' in _skip_qc)
 
     output:
-    file("QC_Stats_Final.xlsx")
+    file("QC_Stats*.xlsx")
 
 
     script:
@@ -240,6 +240,7 @@ process add_cohort_CNVs_to_qc_report{
 
     input:
     file(vcf)
+    file(cnv_log)
     file(qc_file)
 
     output:
@@ -249,6 +250,6 @@ process add_cohort_CNVs_to_qc_report{
     """
     cat $vcf | add_sample_count_to_cohort_vcf.py > cohort_vcf_with_count_column.tsv
     # add it to the QC report now
-    add_cohort_vcf_to_qc.py $qc_file cohort_vcf_with_count_column.tsv Merged_CNV
+    add_cohort_vcf_to_qc.py $qc_file cohort_vcf_with_count_column.tsv Merged_CNV $cnv_log
     """
 }

@@ -50,7 +50,7 @@ process cnvkit_to_bed{
     publishDir "${params.outdir}/VariantCalling/${idSample}/ReCalToMarkedRaw/", mode: params.publish_dir_mode
 
     input:
-    tuple idPatient, idSample, file(cnr)
+    tuple idPatient, idSample, file(cns)
     file(exon_file)
 
     output:
@@ -59,9 +59,9 @@ process cnvkit_to_bed{
     script:
     """
         # strip the first line # the next line is hard coded and needs to be fix before production as does the input parameter
-        sed '1 d' /scratch/Shares/CHCO/workspace/cna_positive_wes/results/cnvkit/VariantCalling/${idSample}/CNVKit/${idSample}.cnr | bedtools intersect -wb -b stdin -a $exon_file > cnvtemp.tsv
-        # sed '1 d' $cnr | bedtools intersect -wb -b stdin -a $exon_file > cnvtemp.tsv
-        python cnv-kit_to_bed.py $idSample ${idSample}.bed cnvtemp.tsv
+        sed '1 d' $cns | bedtools intersect -wb -b stdin -a $exon_file > cnvtemp.tsv
+        # sed '1 d' $cns | bedtools intersect -wb -b stdin -a $exon_file > cnvtemp.tsv
+        cnv-kit_to_bed.py $idSample ${idSample}.bed cnvtemp.tsv
     """
 }
 
@@ -72,32 +72,47 @@ process combine_callers{
     publishDir "${params.outdir}/VariantCalling/${idSample}/AllCNVCallers/", mode: params.publish_dir_mode
 
     input:
-    //tuple caller, idPatient, idSample, file(manta_bed)
-    tuple val(idSample)
     file(savvy_beds)
+    tuple caller, idPatient, idSample, file(cnvkit_bed)
     // add input for CNVKIT eventually
 
     output:
-    tuple idSample, file("${idSample}.multi_caller.bed")
+    tuple idSample, file("${idSample}.multi_caller.bed"), file("${idSample}.log")
 
     script:
     """
-    FILE="${idSample}.coverageBinner_savvy.bed"
-    if test -f "\$FILE"; then
-        cat ${idSample}.coverageBinner_savvy.bed >> temp.bed
+    touch ${idSample}.log
+    if [[ "$savvy_beds" != "not_used"  ]];
+    then    
+        FILE="${idSample}.coverageBinner_savvy.bed"
+        if test -f "\$FILE"; then
+            cat ${idSample}.coverageBinner_savvy.bed >> temp.bed
+        else
+            echo "# No calls from Savvy for $idSample" >> ${idSample}.log
+        fi
     fi 
+
+    if [ "$caller" != "cnvkit_not_used" ];
+    then
+        if [[ \$(wc -l <$cnvkit_bed) -ge 2 ]]
+        then
+            echo ""
+        else
+            echo "# No calls from CNVKit for $idSample" >> ${idSample}.log    
+        fi
+        echo "Adding CNVKit bed"
+        cat $cnvkit_bed >> temp.bed
+    else
+        echo "Skipping CNVKit bed addition"
+    fi
 
     if test -f "temp.bed"; then
         #cnvkit_file=\$(find )
 
         grep -v BND temp.bed | awk '(\$2 <= \$3)' >  filtered_temp.bed
-        echo "2"
         cat filtered_temp.bed | sort -k1,1V -k2,2n -k3,3n > tripple_sorted.bed
-        echo "3"
         bedtools cluster -i tripple_sorted.bed > clustered_test.bed
-        echo "4"
         agg_cluster.py clustered_test.bed > ${idSample}.multi_caller.bed
-        echo "5"
     else
         touch ${idSample}.multi_caller.bed
     fi
@@ -112,6 +127,7 @@ process combine_samples{
 
     input:
     file(all_files)
+    file(all_logs)
     file(example_vcf)
     file(fasta)
     file(fastaFai)
@@ -121,11 +137,16 @@ process combine_samples{
     file("aggregated_multi_sample_multi_caller.bed")
     file("*.vcf")
     path "cnv_all_samples.vcf", emit: cnv_all_samples_vcf
+    path "cnv_all_samples.log", emit: cnv_all_samples_log
 
     script:
     """
     for file in ${all_files}; do
         cat \${file} >> temp.bed
+    done
+
+    for file in ${all_logs}; do
+        cat \${file} >> cnv_all_samples.log
     done
 
     #sort it and cluster it

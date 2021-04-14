@@ -148,8 +148,8 @@ if dna_qc.shape[0] > 0:
     # Limiting to first 100 columns for full fingerprint list...
     writer = excelAutofit(fingerprints[fingerprints.columns[:100]],'DNA Fingerprints',writer,pcts=[col for col in fingerprints.columns if col not in ['Specimen ID','Micronic ID','Fingerprint']])
     writer.sheets['DNA Fingerprints'].freeze_panes(1,2)
-    variants = variants.groupby(['CHROM','POS','REF','ALT']).size().to_frame('Num_Samples').reset_index()
-    variants = variants.loc[variants.Num_Samples > 1].sort_values(by='Num_Samples',ascending=False).reset_index(drop=True)
-    writer = excelAutofit(variants,'DNA Variant Dups',writer,max_width=30)
-    writer.sheets['DNA Variant Dups'].freeze_panes(1,0)
+    #variants = variants.groupby(['CHROM','POS','REF','ALT']).size().to_frame('Num_Samples').reset_index()
+    #variants = variants.loc[variants.Num_Samples > 1].sort_values(by='Num_Samples',ascending=False).reset_index(drop=True)
+    #writer = excelAutofit(variants,'DNA Variant Dups',writer,max_width=30)
+    #writer.sheets['DNA Variant Dups'].freeze_panes(1,0)
 writer.save()

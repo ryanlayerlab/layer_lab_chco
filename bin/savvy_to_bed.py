@@ -32,6 +32,7 @@ try:
     overlap = pd.read_csv(sys.argv[1], sep='\t')
 except pd.errors.EmptyDataError:
     f = open( 'no_calls_from_savvy.bed','w')
+    f.write('# No calls made by savvy for any samples')
     f.close()
     quit()
 

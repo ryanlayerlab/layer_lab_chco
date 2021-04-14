@@ -23,6 +23,9 @@ def excelAutofit(df, name, writer, pcts=[], dec=[], hidden=[], max_width=60):
 qc_file = sys.argv[1]
 vcf_file = sys.argv[2]
 tab_name = sys.argv[3]
+log_file = None
+if len(sys.argv) >= 5:
+    log_file = sys.argv[4]
 # qc_file = 'QC_Stats_Final.xlsx'
 # vcf_file = '/Users/michael/Downloads/cohort_vcf_with_count_column.tsv'
 # tab_name = 'Cohort_VCF'
@@ -34,7 +37,13 @@ for sheet_name in xls.sheet_names:
     sheets.append(df)
 
 df = sheets[0]
-vcf = pd.read_csv(vcf_file, sep='\t', comment='#')
+empty_vcf = False
+try:
+    vcf = pd.read_csv(vcf_file, sep='\t', comment='#')
+except pd.errors.EmptyDataError:
+    vcf = pd.DataFrame()
+    empty_vcf = True
+
 
 names = None
 for line in open(vcf_file,'r'):
@@ -45,7 +54,7 @@ for line in open(vcf_file,'r'):
         break
 
 # error handling for if the vcf if empty
-if names is not None:
+if names is not None and not empty_vcf:
     names[-1] = 'count'
     vcf.columns = names
 
@@ -57,13 +66,20 @@ writer = excelAutofit(df, 'DNA Overview', writer, \
 writer.sheets['DNA Overview'].freeze_panes(1, 2)
 
 for i in range(1, len(xls.sheet_names)):
-    sheets[i].to_excel(writer, sheet_name=xls.sheet_names[i])
+    sheets[i].to_excel(writer, sheet_name=xls.sheet_names[i],index=False)
 
 # error handling for if the vcf if empty
-if names is not None:
-    vcf.to_excel(writer, sheet_name=tab_name)
+print(names)
+print(empty_vcf)
+if names is not None and not empty_vcf:
+    vcf.to_excel(writer, sheet_name=tab_name,index=False)
 else:
-    pd.DataFrame({'No information reported':[]}).to_excel(writer, sheet_name=tab_name)
+    pd.DataFrame({'No information reported':[]}).to_excel(writer, sheet_name=tab_name,index=False)
+
+if log_file is not None:
+    log_df = pd.read_csv(log_file,header=None)
+    log_df.columns = ['Log Information']
+    log_df.to_excel(writer, sheet_name=tab_name + '_log',index=False)
 
 writer.save()
 

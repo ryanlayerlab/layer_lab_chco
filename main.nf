@@ -717,11 +717,26 @@ c) recalibrated bams
 
     //manta_to_bed(wf_manta_single.out.output_tuple,ch_exons_bed_file)
     savvy_to_bed(wf_savvy_cnv_somatic.out.savvy_output,ch_exons_bed_file)
-    //cnvkit_to_bed(wf_cnvkit_single.out.cnr_tuple,ch_exons_bed_file)
-    ch_sample_names = ch_bam_for_vc.map{idP, idS, bam, bai -> [idS]}
-    combine_callers(ch_sample_names, savvy_to_bed.out)
-    all_samples = combine_callers.out.map{id, bed -> [bed]}.collect()
-    combine_samples(all_samples,ch_example_vcf_for_headers,ch_fasta,ch_fasta_fai,ch_dict)
+    
+    ch_cnvkit_beds = Channel.empty()
+    if ( ('cnvkit_single' in tools ) || ('cnvkit_gen_ref' in tools ) ){
+        cnvkit_to_bed(wf_cnvkit_single.out.cns_tuple,ch_exons_bed_file)
+        ch_cnvkit_beds = cnvkit_to_bed.out
+    }else{
+        ch_cnvkit_beds = ch_bam_for_vc.map{idP, idS, bam, bai -> ["cnvkit_not_used",idP,idS,null]}
+    }
+   
+    ch_savvy_beds = Channel.empty()
+    if('savvy_cnv_somatic' in tools ){
+        ch_savvy_beds = savvy_to_bed.out
+    }else{
+        ch_savvy_beds = "not_used"
+    }
+ 
+    combine_callers(ch_savvy_beds, ch_cnvkit_beds)
+    all_samples = combine_callers.out.map{id, bed, log -> [bed]}.collect()
+    all_logs = combine_callers.out.map{id, bed, log -> [log]}.collect()
+    combine_samples(all_samples,all_logs,ch_example_vcf_for_headers,ch_fasta,ch_fasta_fai,ch_dict)
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcf_with_index)
 
     bcf_stats = wf_vcf_stats.out.bcfootls_stats.collect()
@@ -731,10 +746,15 @@ c) recalibrated bams
     fignerprinting = dnaFingerprint.out.collect()
     vcfs = wf_jointly_genotype_gvcf.out.vcf_with_index.collect()
 
+    ch_qc_report = Channel.empty()
     collectQC(file(tsv_path), params.outdir,exon_coverages,raw_exon_coverage,insert_sizes,fignerprinting,bcf_stats,vcfs)
-    add_somalier_to_QC(wf_somalier.out.related.collect(), wf_somalier.out.pedigree, collectQC.out)
-    add_cohort_vc_to_qc_report(wf_jointly_genotype_gvcf.out.cohort_vcf_with_index,add_somalier_to_QC.out)
-    add_cohort_CNVs_to_qc_report(combine_samples.out.cnv_all_samples_vcf,add_cohort_vc_to_qc_report.out)
+    ch_qc_report = collectQC.out
+    if('somalier' in  tools){ 
+        add_somalier_to_QC(wf_somalier.out.related.collect(), wf_somalier.out.pedigree, ch_qc_report)
+        ch_qc_report = add_somalier_to_QC.out
+    }
+    add_cohort_vc_to_qc_report(wf_jointly_genotype_gvcf.out.cohort_vcf_with_index,ch_qc_report)
+    add_cohort_CNVs_to_qc_report(combine_samples.out.cnv_all_samples_vcf,combine_samples.out.cnv_all_samples_log,add_cohort_vc_to_qc_report.out)
 } // end of workflow
 
 
