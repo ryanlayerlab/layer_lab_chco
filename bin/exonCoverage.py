@@ -12,7 +12,7 @@ def exon_coverage(target_file, output_hs_metrics_file, output_file_name):
     
     per_base = pd.read_csv(output_hs_metrics_file, delimiter='\t')
 
-    per_base['good_cov'] = per_base.coverage >= 50
+    per_base['good_cov'] = per_base.coverage >= 20
 
     tot = pd.merge(left=per_base.groupby('target')[['coverage','good_cov']]\
     .sum().reset_index(),right=targets[['target','length']],how='inner',on='target')

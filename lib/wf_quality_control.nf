@@ -28,7 +28,6 @@ process exonCoverage{
     init.sh
     gatk BedToIntervalList -I ${targetBED} -O target.interval_list -SD ${dict}
     gatk BedToIntervalList -I ${baitBED} -O bait.interval_list -SD ${dict}
-    echo "Hi"
     gatk --java-options -Xmx32G CollectHsMetrics --VALIDATION_STRINGENCY SILENT \
     -I ${bam} \
     -O ${idSample}.${outname}.hs_metrics.txt \
