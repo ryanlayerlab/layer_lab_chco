@@ -449,6 +449,7 @@ c) recalibrated bams
        ch_bam_for_cnv = ch_input_sample 
        recalibrated_bam_to_marked_dup_bams(ch_bam_for_vc)
        ch_dup_marked_raw = recalibrated_bam_to_marked_dup_bams.out
+       ch_bam_for_cnv = recalibrated_bam_to_marked_dup_bams.out
     } else{
         ch_bam_for_vc = ch_bam_recal
         ch_bam_for_cnv = ch_bam_marked
