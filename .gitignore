@@ -13,3 +13,5 @@ results/
 *Makefile*
 .idea/
 *xlsx
+*__pycache__/
+*pyc

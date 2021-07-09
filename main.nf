@@ -242,6 +242,10 @@ qc_extra_finger_print_sites = params.extra_finger_print_sites ? Channel.value(fi
 ch_example_vcf_for_headers = params.example_vcf_for_headers ? Channel.value(file(params.example_vcf_for_headers)) : "null"
 ch_exons_bed_file = params.exons_bed_file ? Channel.value(file(params.exons_bed_file)) : "null"
 
+// Parameters for CNV plotting
+ch_genes_file = params.genes_file ? Channel.value(file(params.genes_file)) : "null"
+ch_exons_file = params.exons_file ? Channel.value(file(params.exons_file)) : "null"
+
 /* Create channels for various indices. These channels are either filled by the user parameters or 
 form inside the build_indices workflow */
 ch_fasta_fai = ch_fasta_gz = ch_fasta_gzi = ch_fasta_gz_fai \
@@ -284,6 +288,7 @@ include {ConcatVCF} from './lib/wf_haplotypecaller'
 include {wf_alamut} from './lib/alamut'
 include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC; add_cohort_vc_to_qc_report; add_cohort_CNVs_to_qc_report} from './lib/wf_quality_control'
 include {manta_to_bed; savvy_to_bed; combine_callers; combine_samples; cnvkit_to_bed} from './lib/wf_agg_cnv'
+include {wf_cnv_data_prepossessing} from './lib/wf_cnv_plotting.nf'
 
 workflow{
 
@@ -416,8 +421,9 @@ workflow{
             ch_dict
             )
 
+    wf_cnv_data_prepossessing(ch_bam_marked,ch_target_bed,ch_fasta,ch_fasta_fai,ch_dict,ch_genes_file)
 
-/* At this point we have the following bams:
+/ At this point we have the following bams:
 a) raw unmarked bams
 b) marked bams)
 c) recalibrated bams
