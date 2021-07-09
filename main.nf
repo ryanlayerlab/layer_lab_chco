@@ -12,7 +12,7 @@ include {helpMessage;printSummary;
         flowcellLaneFromFastq; hasExtension;
         returnFile; reduceVCF;
         returnStatus; getVCFsToAnnotate;
-        extractGvcfs
+        extractGvcfs; recalibrated_bam_to_marked_dup_bams
         } from './lib/utility' 
 
 if (params.help) exit 0, helpMessage()
@@ -85,6 +85,7 @@ if (tsv_path) {
     switch (step) {
         case 'mapping': ch_input_sample = extractFastq(tsvFile); break
         case 'markdups': ch_input_sample = extractUnmarked(tsvFile); break
+        case 'qc': ch_input_sample = extractBam(tsvFile); break
         case 'recalibrate': ch_input_sample = extractDupMarked(tsvFile); break
         case 'variantcalling': ch_input_sample = extractBam(tsvFile); break
         case 'joint_genotype': ch_input_sample = extractGvcfs(tsvFile); break
@@ -238,6 +239,12 @@ ch_chco_highqual_snps = params.chco_highqual_snps ? Channel.value(file(params.ch
 // Parameters needed for QC
 qc_finger_print_sites = params.finger_print_sites ? Channel.value(file(params.finger_print_sites)) : "null"
 qc_extra_finger_print_sites = params.extra_finger_print_sites ? Channel.value(file(params.extra_finger_print_sites)) : "null"
+ch_example_vcf_for_headers = params.example_vcf_for_headers ? Channel.value(file(params.example_vcf_for_headers)) : "null"
+ch_exons_bed_file = params.exons_bed_file ? Channel.value(file(params.exons_bed_file)) : "null"
+
+// Parameters for CNV plotting
+ch_genes_file = params.genes_file ? Channel.value(file(params.genes_file)) : "null"
+ch_exons_file = params.exons_file ? Channel.value(file(params.exons_file)) : "null"
 
 /* Create channels for various indices. These channels are either filled by the user parameters or 
 form inside the build_indices workflow */
@@ -279,7 +286,9 @@ include {wf_vcf_stats} from './lib/wf_vcf_stats'
 include {wf_multiqc} from './lib/wf_multiqc' 
 include {ConcatVCF} from './lib/wf_haplotypecaller'
 include {wf_alamut} from './lib/alamut'
-include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites} from './lib/quality_control'
+include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC; add_cohort_vc_to_qc_report; add_cohort_CNVs_to_qc_report} from './lib/wf_quality_control'
+include {manta_to_bed; savvy_to_bed; combine_callers; combine_samples; cnvkit_to_bed} from './lib/wf_agg_cnv'
+include {wf_cnv_data_prepossessing} from './lib/wf_cnv_plotting.nf'
 
 workflow{
 
@@ -332,7 +341,7 @@ workflow{
         ch_bam_mapped = wf_gather_mapped_partial_reads.out.bams_mapped
         ch_bam_for_cnv = ch_bam_mapped
         // Now we check if we need to filter the bams
-        if (params.filter_bams){
+        if (params.filter_bams ){
             // In this case we'll use the filtered bams for most downstream analyses
             // We still keep the raw (unfiltered bams) around for copy number callers
             // ch_partial_mapped_reads.dump(tag:'target for filtering:')
@@ -351,6 +360,10 @@ workflow{
         }
             
         ch_fastqc_report = wf_fastqc_fq.out.fastqc_reports.collect()
+    }else{
+        //mark raw bams, used for exon coverage qc
+        wf_mark_duplicates_raw_bams(ch_bam_mapped)
+        ch_bam_mapped_raw = wf_mark_duplicates_raw_bams.out.dm_bams
     } 
 
     // If the pipeline is being started from the step 'markdups'
@@ -370,6 +383,10 @@ workflow{
     if (!(step in ['recalibrate', 'variantcalling', 'joint_genotype', 'annotate'])){
             wf_mark_duplicates(ch_bam_mapped)
             ch_bam_marked = wf_mark_duplicates.out.dm_bams
+    }
+
+    if (step == 'qc'){
+        ch_bam_marked = ch_input_sample
     }
 
     wf_somalier(ch_bam_marked,
@@ -404,15 +421,9 @@ workflow{
             ch_dict
             )
 
-    // QC stats that go into final QC excel report
-    // exonCoverage(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed,"recal")
-    // onTarget(ch_bam_recal,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_padded_target_bed)
-    // wf_raw_bam_exonCoverage(ch_bam_mapped,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
-    // insertSize(ch_bam_recal)
-    // wf_qc_fingerprinting_sites(ch_bam_recal,qc_extra_finger_print_sites)
-    // dnaFingerprint(ch_bam_recal,qc_finger_print_sites,"Normal")
+    wf_cnv_data_prepossessing(ch_bam_marked,ch_target_bed,ch_fasta,ch_fasta_fai,ch_dict,ch_genes_file)
 
-/* At this point we have the following bams:
+/ At this point we have the following bams:
 a) raw unmarked bams
 b) marked bams)
 c) recalibrated bams
@@ -438,14 +449,19 @@ c) recalibrated bams
     )
 
     ch_bam_for_vc = Channel.empty()
-    if ((step == 'variantcalling') || (step ==  'joint_genotype') ){
+    ch_dup_marked_raw = Channel.empty()
+    if ((step == 'variantcalling') || (step ==  'joint_genotype') || (step ==  'qc') ){
        ch_bam_for_vc = ch_input_sample 
        ch_bam_for_cnv = ch_input_sample 
+       recalibrated_bam_to_marked_dup_bams(ch_bam_for_vc)
+       ch_dup_marked_raw = recalibrated_bam_to_marked_dup_bams.out
+       ch_bam_for_cnv = recalibrated_bam_to_marked_dup_bams.out
     } else{
         ch_bam_for_vc = ch_bam_recal
         ch_bam_for_cnv = ch_bam_marked
     }
 
+        
     // Handle the Mutect2 related workflows
 
     
@@ -676,7 +692,7 @@ c) recalibrated bams
     //     wf_jointly_genotype_gvcf.out.vcfs_with_indexes
     //     )
     wf_vcf_stats(wf_deepvariant.out.vcf,
-        Channel.empty()
+        wf_individually_genotype_gvcf.out.sample_vcf_HC 
         )
 
     wf_multiqc(
@@ -691,8 +707,61 @@ c) recalibrated bams
         wf_vcf_stats.out.vcfootls_stats
     )
 
+     // QC stats that go into final QC excel report
+     exonCoverage(ch_bam_for_vc,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed,"recal")
+     onTarget(ch_bam_for_vc,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_padded_target_bed)
+     
+     if (step == 'qc'){
+         ch_marked_raw = ch_dup_marked_raw
+     }else{
+         ch_marked_raw = ch_bam_mapped_raw
+     }
+     
+     wf_raw_bam_exonCoverage(ch_marked_raw,ch_fasta,ch_fasta_fai,ch_dict,ch_target_bed,ch_bait_bed)
+     insertSize(ch_bam_for_vc)
+     wf_qc_fingerprinting_sites(ch_bam_for_vc,qc_extra_finger_print_sites)
+     dnaFingerprint(ch_bam_for_vc,qc_finger_print_sites,"Normal")
+
+    //manta_to_bed(wf_manta_single.out.output_tuple,ch_exons_bed_file)
+    savvy_to_bed(wf_savvy_cnv_somatic.out.savvy_output,ch_exons_bed_file)
+    
+    ch_cnvkit_beds = Channel.empty()
+    if ( ('cnvkit_single' in tools ) || ('cnvkit_gen_ref' in tools ) ){
+        cnvkit_to_bed(wf_cnvkit_single.out.cns_tuple,ch_exons_bed_file)
+        ch_cnvkit_beds = cnvkit_to_bed.out
+    }else{
+        ch_cnvkit_beds = ch_bam_for_vc.map{idP, idS, bam, bai -> ["cnvkit_not_used",idP,idS,null]}
+    }
+   
+    ch_savvy_beds = Channel.empty()
+    if('savvy_cnv_somatic' in tools ){
+        ch_savvy_beds = savvy_to_bed.out
+    }else{
+        ch_savvy_beds = "not_used"
+    }
+ 
+    combine_callers(ch_savvy_beds, ch_cnvkit_beds)
+    all_samples = combine_callers.out.map{id, bed, log -> [bed]}.collect()
+    all_logs = combine_callers.out.map{id, bed, log -> [log]}.collect()
+    combine_samples(all_samples,all_logs,ch_example_vcf_for_headers,ch_fasta,ch_fasta_fai,ch_dict)
     // wf_alamut(wf_jointly_genotype_gvcf.out.vcf_with_index)
-    // collectQC(file(tsv_path), params.outdir,exonCoverage.out,wf_raw_bam_exonCoverage.out,insertSize.out,dnaFingerprint.out,wf_vcf_stats.out.bcfootls_stats,wf_alamut.out)
+
+    bcf_stats = wf_vcf_stats.out.bcfootls_stats.collect()
+    exon_coverages = exonCoverage.out.files.collect()
+    raw_exon_coverage = wf_raw_bam_exonCoverage.out.raw_onTarget.collect()
+    insert_sizes = insertSize.out.files.collect()
+    fignerprinting = dnaFingerprint.out.collect()
+    vcfs = wf_jointly_genotype_gvcf.out.vcf_with_index.collect()
+
+    ch_qc_report = Channel.empty()
+    collectQC(file(tsv_path), params.outdir,exon_coverages,raw_exon_coverage,insert_sizes,fignerprinting,bcf_stats,vcfs)
+    ch_qc_report = collectQC.out
+    if('somalier' in  tools){ 
+        add_somalier_to_QC(wf_somalier.out.related.collect(), wf_somalier.out.pedigree, ch_qc_report)
+        ch_qc_report = add_somalier_to_QC.out
+    }
+    add_cohort_vc_to_qc_report(wf_jointly_genotype_gvcf.out.cohort_vcf_with_index,ch_qc_report)
+    add_cohort_CNVs_to_qc_report(combine_samples.out.cnv_all_samples_vcf,combine_samples.out.cnv_all_samples_log,add_cohort_vc_to_qc_report.out)
 } // end of workflow
 
 

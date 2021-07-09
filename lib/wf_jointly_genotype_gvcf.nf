@@ -68,7 +68,7 @@ workflow wf_jointly_genotype_gvcf{
     emit:
     vcf_with_index = SelectVariants.out[0]
     // vcfs_without_indexes = ConcatVCF.out.concatenated_vcf_without_index
-    // cohort_vcf_with_index = CohortConcatVCF.out.cohort_vcf_with_index
+    cohort_vcf_with_index = CohortConcatVCF.out.cohort_vcf_with_index
     // cohort_vcf_without_index = CohortConcatVCF.out[1]
 } // end of wf_haplotypecaller
 
@@ -138,14 +138,14 @@ process GenotypeGVCFs {
     // Using -L is important for speed and we have to index the interval files also
     """
     init.sh
-    echo "cohort_gvcf: ${cohort_gvcf}"
-    echo "tbi: ${tbi}"
-    echo "intervalBed: ${intervalBed}"
-    echo "fasta: ${fasta}"
-    echo "fastaFai: ${fastaFai}"
-    echo "dict: ${dict}"
-    echo "dbsnp: ${dbsnp}"
-    echo "dbsnpIndex: ${dbsnpIndex}"
+    #echo "cohort_gvcf: ${cohort_gvcf}"
+    #echo "tbi: ${tbi}"
+    #echo "intervalBed: ${intervalBed}"
+    #echo "fasta: ${fasta}"
+    #echo "fastaFai: ${fastaFai}"
+    #echo "dict: ${dict}"
+    #echo "dbsnp: ${dbsnp}"
+    #echo "dbsnpIndex: ${dbsnpIndex}"
     gatk --java-options -Xmx${task.memory.toGiga()}g \
         GenotypeGVCFs \
         -R ${fasta} \
@@ -206,7 +206,7 @@ process SelectVariants {
     output:
     // tuple val("HaplotypeCaller_Jointly_Genotyped"), id_patient, id_sample, file("${interval_bed.baseName}_${id_sample}.vcf"), emit: vcf_SelectVariants
     
-    tuple val("HaplotypeCaller_Jointly_Genotyped"), idSample, file("${idSample}.vcf.gz"), file("${idSample}.vcf.gz.tbi")
+    tuple val("HaplotypeCaller_Jointly_Genotyped"), val('patient id placeholder') ,idSample, file("${idSample}.vcf.gz"), file("${idSample}.vcf.gz.tbi")
     tuple file("${idSample}.vcf.gz"), file("${idSample}.vcf.gz.tbi")
     when: ('joint_genotype' in tools )
 

@@ -24,7 +24,7 @@ process IndexBamFile {
 
 process ConcatVCF {
     label 'cpus_8'
-
+    label 'container_llab'
     tag {variantCaller + "-" + idSample}
 
     publishDir "${params.outdir}/VariantCalling/${idSample}/${output_dir}", mode: params.publish_dir_mode
@@ -389,7 +389,8 @@ def defineStepList() {
         'recalibrate',
         'variantcalling',
         'joint_genotype',
-        'annotate'
+        'annotate',
+        'qc'
     ]
 }
 
@@ -427,7 +428,9 @@ def defineToolList() {
         'strelka',
         'tiddit',
         // 'tnscope',
-        'vep'
+        'vep',
+	'alamut',
+	'somalier'
     ]
 }
 
@@ -766,4 +769,24 @@ def getVCFsToAnnotate(results_dir, annotate_tools, tsv){
     //vcfNoAnnotate.close()
     //vcfAnnotation = vcfAnnotation.mix(vcfToAnnotate)
     return vcf_to_annotate
+}
+
+// When restarting from recalibrated bams to run QC this makes the assumption the marked dup raw bams are in a specific location so somalier can still be run
+process recalibrated_bam_to_marked_dup_bams{
+    tag {idPatient + "-" + idSample}
+    label 'container_llab'
+
+    publishDir "${params.outdir}/VariantCalling/${idSample}/ReCalToMarkedRaw/", mode: params.publish_dir_mode
+
+    input:
+    tuple idPatient, idSample, file(bam), file(bai)
+
+    output:
+	tuple idPatient, idSample, file("${idSample}.md.bam"), file("${idSample}.md.bai")
+
+    script:
+    """
+        cp $PWD/results/Preprocessing/$idSample/DuplicateMarkedRaw/${idSample}.md.bam ./
+	cp $PWD/results/Preprocessing/$idSample/DuplicateMarkedRaw/${idSample}.md.bai ./
+    """
 }

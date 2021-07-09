@@ -14,6 +14,8 @@ workflow wf_manta_single{
             _fasta_fai,
             _target_bed
         )
+    emit:
+        output_tuple = MantaSingle.out
 } // end of wf_germline_cnv
 
 

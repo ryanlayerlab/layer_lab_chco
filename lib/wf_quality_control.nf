@@ -18,17 +18,16 @@ process exonCoverage{
 
 
     output:
-    file("${idSample}.*")
+    path "${idSample}.*", emit: files
     file("target.interval_list")
 
-    when: !('exon_coverage' in skipQC) && params.bait_bed
+    when: ! ('chco_qc' in _skip_qc)  && params.bait_bed
 
     script:
     """
     init.sh
     gatk BedToIntervalList -I ${targetBED} -O target.interval_list -SD ${dict}
     gatk BedToIntervalList -I ${baitBED} -O bait.interval_list -SD ${dict}
-    echo "Hi"
     gatk --java-options -Xmx32G CollectHsMetrics --VALIDATION_STRINGENCY SILENT \
     -I ${bam} \
     -O ${idSample}.${outname}.hs_metrics.txt \
@@ -36,8 +35,7 @@ process exonCoverage{
     -BI bait.interval_list \
     --PER_BASE_COVERAGE ${bam.baseName}.per_base_coverage.txt \
     -R ${fasta}
-
-    python /scratch/Shares/layer/workspace/michael_sandbox/QC_pipeline/bin/exonCoverage.py target.interval_list ${bam.baseName}.per_base_coverage.txt ${bam.baseName}_per_exon_coverage.txt
+    exonCoverage.py target.interval_list ${bam.baseName}.per_base_coverage.txt ${bam.baseName}_per_exon_coverage.txt
     """
 }
 
@@ -61,14 +59,13 @@ process onTarget{
     output:
     file("${bam.baseName}_on_target.txt")
 
-    when: !('on_target' in skipQC)
+    when: ! ('chco_qc' in _skip_qc)
 
     script:
     """
     init.sh
     gatk BedToIntervalList -I ${probes} -O probes.interval_list -SD ${dict}
     gatk BedToIntervalList -I ${probes250} -O probes250.interval_list -SD ${dict}
-
         bedtools intersect -a $bam -b ${probes250} | gatk --java-options -Xmx32G CollectHsMetrics \
     --VALIDATION_STRINGENCY SILENT \
         -I /dev/stdin \
@@ -92,8 +89,8 @@ workflow wf_raw_bam_exonCoverage{
     main:
         exonCoverage(_bams,_fasta,_fasta_fai,_dict,_target,_bait,"raw")
 
-        //emit:
-        //raw_onTarget = exonCoverage.out
+    emit:
+        raw_onTarget = exonCoverage.out.files
 }
 
 workflow wf_qc_fingerprinting_sites{
@@ -103,6 +100,9 @@ workflow wf_qc_fingerprinting_sites{
 
     main:
          dnaFingerprint(_bam,_sites,"Extra")
+
+    emit:
+        fingerprint = dnaFingerprint.out
 }
 
 process insertSize{
@@ -117,10 +117,10 @@ process insertSize{
 
 
     output:
-    file("${idSample}_insert_size_metrics.txt")
-        file("${idSample}_insert_size_histogram.pdf")
+    path "${idSample}_insert_size_metrics.txt", emit: files
+    file("${idSample}_insert_size_histogram.pdf")
 
-    when: !('insert_size' in skipQC)
+    when: ! ('chco_qc' in _skip_qc)
 
     script:
     """
@@ -147,7 +147,7 @@ process dnaFingerprint{
     output:
     file("${idSample}_DNA_Fingerprint.txt")
 
-    when: !('dnaFingerprint' in skipQC)
+    when: ! ('chco_qc' in _skip_qc)
 
     script:
     """
@@ -156,19 +156,23 @@ process dnaFingerprint{
 }
 
 process collectQC{
-    label 'container_llab'
+    label 'container_py3_pandas'
     publishDir "${params.outdir}/Reports/${idSample}/FingerPrinting/", mode: params.publish_dir_mode
     publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
+
+    cache false
 
     input:
     file(sample_file)
     file(results_dir)
     file(exon)
-    file(exon2)
     file(raw_exon)
     file(insertsize)
     file(fingerprint)
     file(bcf)
+    file(unknown)
+
+    when: ! ('chco_qc' in _skip_qc)
 
     output:
     file("QC_Stats.xlsx")
@@ -181,5 +185,70 @@ process collectQC{
         echo ${params.input}
         echo \$PWD
         collectQC.py ${sample_file} ${params.outdir} \$PWD
+    """
+}
+
+process add_somalier_to_QC{
+    label 'container_py3_pandas'
+    publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
+
+    input:
+    tuple file(html), file(pairs), file(samples)
+    file(pedigree)
+	file(pre_QC_stats)
+
+
+    when: ! ('chco_qc' in _skip_qc)
+
+    output:
+    file("QC_Stats*.xlsx")
+
+
+    script:
+    """
+        somalier_to_excel.py $pre_QC_stats $samples $pairs $pedigree
+    """
+}
+
+process add_cohort_vc_to_qc_report{
+    tag {idPatient + "-" + idSample}
+    label 'container_py3_pandas'
+
+    publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
+
+    input:
+    tuple file(vcfgz), file(vcfgzindex)
+    file(qc_file)
+
+    output:
+    file('QC_Stats_*.xlsx')
+
+    script:
+    """
+    zcat $vcfgz | add_sample_count_to_cohort_vcf.py > cohort_vcf_with_count_column.tsv
+    # add it to the QC report now
+    add_cohort_vcf_to_qc.py $qc_file cohort_vcf_with_count_column.tsv Cohort_VCF
+    """
+}
+
+process add_cohort_CNVs_to_qc_report{
+    tag {idPatient + "-" + idSample}
+    label 'container_py3_pandas'
+
+    publishDir "${params.outdir}/QC/collectQC", mode: params.publish_dir_mode
+
+    input:
+    file(vcf)
+    file(cnv_log)
+    file(qc_file)
+
+    output:
+    file('QC_Stats*.xlsx')
+
+    script:
+    """
+    cat $vcf | add_sample_count_to_cohort_vcf.py > cohort_vcf_with_count_column.tsv
+    # add it to the QC report now
+    add_cohort_vcf_to_qc.py $qc_file cohort_vcf_with_count_column.tsv Merged_CNV $cnv_log
     """
 }

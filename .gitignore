@@ -4,6 +4,14 @@ logs/
 nf_reports/
 analysis/
 results/
-Makefile
+*Makefile*
 .nextflow/
 .nextflow.log*
+*tsv
+*vcf
+*bed
+*Makefile*
+.idea/
+*xlsx
+*__pycache__/
+*pyc

@@ -42,7 +42,8 @@ workflow wf_cnvkit_single{
         CallSegment(Segment.out[0])
         Scatter(Segment.out[1])
         // Diagram(Segment.out[1])
-
+    emit:
+    cns_tuple = CallSegment.out
 } // end of wf_germline_cnv
 
 process PrepareTargets{
