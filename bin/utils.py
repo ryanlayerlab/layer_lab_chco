@@ -30,13 +30,14 @@ def get_header(bed_file, tbx=None):
         tbx = TabixFile(bed_file)
     return tbx.header
 
-def get_intervals_in_region(target_interval, bed_file, tbx=None):
+def get_intervals_in_region(target_interval, bed_file, tbx=None, ignore=None):
     if tbx is None:
         tbx = TabixFile(bed_file)
     intervals = []
     for row in tbx.fetch(target_interval.chrom,
                          target_interval.start,
                          target_interval.end):
+        if ignore is not None and ignore in row: continue
         A = row.rstrip().split()
         cord = Interval(chrom=A[0],
                         start=int(A[1]),

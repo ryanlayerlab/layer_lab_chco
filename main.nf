@@ -245,6 +245,7 @@ ch_exons_bed_file = params.exons_bed_file ? Channel.value(file(params.exons_bed_
 // Parameters for CNV plotting
 ch_genes_file = params.genes_file ? Channel.value(file(params.genes_file)) : "null"
 ch_exons_file = params.exons_file ? Channel.value(file(params.exons_file)) : "null"
+savvy_sizes = params.savvy_sizes ? Channel.from(params.savvy_sizes.split(',')) : Channel.fromList([6000])
 
 /* Create channels for various indices. These channels are either filled by the user parameters or 
 form inside the build_indices workflow */
@@ -252,7 +253,6 @@ ch_fasta_fai = ch_fasta_gz = ch_fasta_gzi = ch_fasta_gz_fai \
 = ch_bwa_index = ch_dict = ch_dbsnp_index = ch_germline_resource_index \
 =  ch_somatic_pon_index =  Channel.empty()
 printSummary(params)
-
 
 include {wf_get_software_versions} from './lib/wf_get_software_versions' 
 include {wf_build_indexes} from './lib/wf_build_indexes' 
@@ -288,7 +288,7 @@ include {ConcatVCF} from './lib/wf_haplotypecaller'
 include {wf_alamut} from './lib/alamut'
 include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC; add_cohort_vc_to_qc_report; add_cohort_CNVs_to_qc_report} from './lib/wf_quality_control'
 include {manta_to_bed; savvy_to_bed; combine_callers; combine_samples; cnvkit_to_bed} from './lib/wf_agg_cnv'
-include {wf_cnv_data_prepossessing} from './lib/wf_cnv_plotting.nf'
+include {wf_cnv_data_prepossessing; combine_savvy_calls; cnv_plotter} from './lib/wf_cnv_plotting.nf'
 
 workflow{
 
@@ -613,7 +613,7 @@ c) recalibrated bams
     )
     
     wf_savvy_cnv_somatic(ch_bam_for_vc,
-                         ch_savvy_controls_dir)
+                         ch_savvy_controls_dir, savvy_sizes)
     
     (ch_normal_md_bam, ch_tumor_md_bam) = 
         ch_bam_for_vc.branch{
@@ -724,7 +724,16 @@ c) recalibrated bams
 
     //manta_to_bed(wf_manta_single.out.output_tuple,ch_exons_bed_file)
     savvy_to_bed(wf_savvy_cnv_somatic.out.savvy_output,ch_exons_bed_file)
-    
+    combine_savvy_calls(wf_savvy_cnv_somatic.out.savvy_param_output.collect())
+    ch_savvy_calls = combine_savvy_calls.out.splitText(){it.split("\t")}.map{ x -> [x[0],x[1],x[2],x[3],x[4]] }
+    cnv_plotter(wf_cnv_data_prepossessing.out.allele_balance,
+        wf_cnv_data_prepossessing.out.adj_probe_scores,
+        wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect(),
+        wf_cnv_data_prepossessing.out.labeled_exons,
+        wf_cnv_data_prepossessing.out.probe_cover_mean_std,
+        ch_savvy_calls,
+        wf_savvy_cnv_somatic.out.savvy_param_output.collect())
+
     ch_cnvkit_beds = Channel.empty()
     if ( ('cnvkit_single' in tools ) || ('cnvkit_gen_ref' in tools ) ){
         cnvkit_to_bed(wf_cnvkit_single.out.cns_tuple,ch_exons_bed_file)
@@ -752,7 +761,7 @@ c) recalibrated bams
     insert_sizes = insertSize.out.files.collect()
     fignerprinting = dnaFingerprint.out.collect()
     vcfs = wf_jointly_genotype_gvcf.out.vcf_with_index.collect()
-
+    /* Un-comment this eventually
     ch_qc_report = Channel.empty()
     collectQC(file(tsv_path), params.outdir,exon_coverages,raw_exon_coverage,insert_sizes,fignerprinting,bcf_stats,vcfs)
     ch_qc_report = collectQC.out
@@ -762,6 +771,7 @@ c) recalibrated bams
     }
     add_cohort_vc_to_qc_report(wf_jointly_genotype_gvcf.out.cohort_vcf_with_index,ch_qc_report)
     add_cohort_CNVs_to_qc_report(combine_samples.out.cnv_all_samples_vcf,combine_samples.out.cnv_all_samples_log,add_cohort_vc_to_qc_report.out)
+    */
 } // end of workflow
 
 
