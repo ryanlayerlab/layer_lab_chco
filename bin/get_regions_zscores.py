@@ -27,7 +27,7 @@ def main():
 
     file_i = 0
 
-    for rate_file in glob.glob(args.rate_dir + '*.probe.coverage_rate.bed.gz'):
+    for rate_file in glob.glob(args.rate_dir + '*.probe.*.bed.gz'):
         with gzip.open(rate_file,'rt') as f:
             line_i = 0
             for l in f:

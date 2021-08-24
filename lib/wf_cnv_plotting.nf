@@ -1,3 +1,187 @@
+workflow wf_cnv_build_proband_db{
+    take: _bams_vcfs
+    take: _probes
+    take: _calls
+    main: 
+    _bams = _bams_vcfs.map{ids, vcf, tbi, bam, bai  -> [ids, ids, bam, bai]}   
+    _vcfs = _bams_vcfs.map{ids,vcf, tbi, bam, bai  -> [ids, ids, vcf, tbi]}
+    _id = _bams_vcfs.map{ids,vcf, tbi, bam, bai  -> ids}
+
+    mosdepth(_bams)
+    gzip_probes(_probes)
+    count_reads(_bams)
+    get_total_reads(count_reads.out.map{idP, idS, counts -> [counts]}.collect())
+    get_probe_reads_per_million(mosdepth.out,get_total_reads.out,gzip_probes.out)
+
+    _rpm = get_probe_reads_per_million.out.map{pid,sid,rpm,gz -> [sid,rpm,gz]}
+    _bams_vcfs_rpms = _bams_vcfs.join(_rpm,remainder: true)
+
+    _id = _bams_vcfs.map{ids,vcf, tbi, bam, bai  -> ids}
+
+    compile_proband_db(_bams_vcfs_rpms,
+                mosdepth.out,
+                get_total_reads.out,
+                _calls)
+
+    emit:
+    mosdepth = mosdepth.out
+    rpm = get_probe_reads_per_million.out
+    read_counts = count_reads.out
+    total_read_counts = get_total_reads.out
+    db = compile_proband_db.out
+}
+
+workflow wf_cnv_build_panel_db{
+    take: _bams_unfiltered
+    take: _probes
+    take: _calls
+    take: _vcfs
+
+    main:
+    mosdepth(_bams_unfiltered)
+    gzip_probes(_probes)
+    count_reads(_bams_unfiltered)
+    get_total_reads(count_reads.out.map{idP, idS, counts -> [counts]}.collect())
+    get_probe_reads_per_million(mosdepth.out,get_total_reads.out,gzip_probes.out)
+    compile_db("ReferencePanel",mosdepth.out.collect(),get_probe_reads_per_million.out.collect(),count_reads.out.collect(),get_total_reads.out.collect(),_vcfs.collect(),_calls.collect())
+
+    emit:
+    mosdepth = mosdepth.out
+    rpm = get_probe_reads_per_million.out
+    read_counts = count_reads.out
+    total_read_counts = get_total_reads.out   
+    db = compile_db.out
+}
+
+workflow wf_CNViz_compile{
+    take: proband_db
+    take: ref_panel_db
+    take: genes_file
+
+    main:
+    // combine all of the RPM results
+    combine_rpm_files(ref_panel_db,proband_db)
+    get_regions_zscores(combine_rpm_files.out)
+
+    get_adj_zscore(combine_rpm_files.out.map{id,files -> [files]}, get_regions_zscores.out)
+    get_probe_cover_mean_std(combine_rpm_files.out)
+    merge_adj_scores(get_adj_zscore.out)
+
+    
+    // allele balance portion
+    //collect_allele_counts(_bams_unfiltered,_probes,_ref,_ref_fai,_ref_dict)
+    //agg_allele_counts(collect_allele_counts.out, _probes)
+    //merge_all_allele_counts(agg_allele_counts.out.map{ idP, idS, counts -> [counts]}.collect(), _probes)
+    label_exons(genes_file)
+
+    emit:
+    combine_rpm_files.out
+    adj_probe_scores = merge_adj_scores.out
+    //labeled_exons = label_exons.out
+    probe_cover_mean_std = get_probe_cover_mean_std.out
+
+    
+}
+
+process combine_rpm_files{
+    label 'container_llab'
+    label 'cpus_1'
+    publishDir "${params.outdir}/CNV_Plotting/All_RPM_${sid}", mode: params.publish_dir_mode    
+
+    input:
+        tuple file(rpm), file(calls), file(bam), file(vcf), file(mosdepth)
+        tuple sid, file(pro_rpm), file(pro_calls), file(pro_bam), file(pro_vcf), file(pro_mosdepth)
+
+    output:
+        tuple sid, file("*rpm_rate.bed*")
+        
+
+    script:
+    """
+    cp ${rpm}/* ./
+    cp ${pro_rpm}/* ./ 
+    """
+}
+
+process compile_proband_db{
+    //label 'container_llab'
+    label 'cpus_1'
+
+    // tag {idSample}
+    publishDir "${params.outdir}/CNV_Plotting/DB_${sid}", mode: params.publish_dir_mode
+    input:
+        tuple sid, file(vcf), file(tbi), file(bam), file(bai), file(rpm), file(rpm_tbi)
+        file(all_mosdepth) // mosdepth
+        file(all_total_read_count)// total read count
+        file(all_calls)
+
+    output:
+        tuple sid, file("${sid}_RPM"), file("${sid}_Calls"), file("${sid}_BAM"), file("${sid}_VCF"), file("${sid}_MosDepth")
+
+    script:
+    """
+    mkdir ${sid}_Calls
+    mv $all_calls ${sid}_Calls
+    
+    mkdir ${sid}_VCF
+    mv $vcf ${sid}_VCF
+    mv $tbi ${sid}_VCF
+    
+    mkdir ${sid}_BAM
+    mv $bam ${sid}_BAM
+    mv $bai ${sid}_BAM
+    
+    mkdir ${sid}_RPM
+    mv $rpm ${sid}_RPM
+    mv $rpm_tbi ${sid}_RPM
+    
+    mkdir ${sid}_MosDepth
+    mv $all_mosdepth ${sid}_MosDepth
+    
+    mkdir ${sid}_TotalReads
+    mv $all_total_read_count ${sid}_TotalReads
+    """
+}
+
+process compile_db{
+    //label 'container_llab'
+    label 'cpus_1'
+
+    // tag {idSample}
+    publishDir "${params.outdir}/CNV_Plotting/DB_${save_name}", mode: params.publish_dir_mode
+    input:
+        val(save_name)
+        file(all_mosdepth) // mosdepth
+        file(all_rpm)// rpm
+        file(all_read_count)// read count
+        file(all_total_read_count)// total read count
+        file(all_vcfs)
+        file(all_calls)
+
+    output:
+        tuple file("${save_name}_RPM"), file("${save_name}_Calls"), file("${save_name}_BAM"), file("${save_name}_VCF"), file("${save_name}_MosDepth")
+
+    script:
+    """
+    mkdir ${save_name}_Calls
+    mv $all_calls ${save_name}_Calls
+    
+    mkdir ${save_name}_VCF
+    mv $all_vcfs ${save_name}_VCF
+    
+    mkdir ${save_name}_BAM
+    
+    mkdir ${save_name}_RPM
+    mv $all_rpm ${save_name}_RPM
+    
+    mkdir ${save_name}_MosDepth
+    mv $all_mosdepth ${save_name}_MosDepth
+    
+    mkdir ${save_name}_TotalReads
+    mv $all_total_read_count ${save_name}_TotalReads
+    """
+}
+
 workflow wf_cnv_data_prepossessing{
     take: _bams_unfiltered
     take: _probes
@@ -13,12 +197,13 @@ workflow wf_cnv_data_prepossessing{
     get_total_reads(count_reads.out.map{idP, idS, counts -> [counts]}.collect())
     get_probe_reads_per_million(mosdepth.out,get_total_reads.out,gzip_probes.out)
     exon_coverage_rates(mosdepth.out, gzip_probes.out)
-    get_regions_zscores(exon_coverage_rates.out.map{idP, idS, bed_gz, bed_gz_tbi -> [bed_gz, bed_gz_tbi]}.collect())
-    get_adj_zscore(exon_coverage_rates.out, get_regions_zscores.out)
-    get_probe_cover_mean_std(exon_coverage_rates.out.map{idP, idS, bed_gz, bed_gz_tbi -> [bed_gz, bed_gz_tbi]}.collect())
+    
+    get_regions_zscores(get_probe_reads_per_million.out.map{idP, idS, bed_gz, bed_gz_tbi -> [bed_gz, bed_gz_tbi]}.collect())
+    get_adj_zscore(get_probe_reads_per_million.out, get_regions_zscores.out)
+    get_probe_cover_mean_std(get_probe_reads_per_million.out.map{idP, idS, bed_gz, bed_gz_tbi -> [bed_gz, bed_gz_tbi]}.collect())
     merge_adj_scores(get_adj_zscore.out.map{idP, idS, bed_gz, bed_gz_tbi -> [bed_gz, bed_gz_tbi]}.collect())
 
-    println(get_adj_zscore.out.map{idP, idS, bed_gz, bed_gz_tbi -> [bed_gz, bed_gz_tbi]}.collect().view())
+    // println(get_adj_zscore.out.map{idP, idS, bed_gz, bed_gz_tbi -> [bed_gz, bed_gz_tbi]}.collect().view())
 
     // allele balance portion
     collect_allele_counts(_bams_unfiltered,_probes,_ref,_ref_fai,_ref_dict)
@@ -28,9 +213,9 @@ workflow wf_cnv_data_prepossessing{
 
     emit:
     adj_probe_scores = merge_adj_scores.out
-    allele_balance = merge_all_allele_counts.out
-    labeled_exons = label_exons.out
-    probe_cover_mean_std = get_probe_cover_mean_std.out
+    //allele_balance = merge_all_allele_counts.out
+    //labeled_exons = label_exons.out
+    //probe_cover_mean_std = get_probe_cover_mean_std.out
     
 } //  end of wf_cnv_coverage_depth
 
@@ -89,7 +274,7 @@ process get_probe_reads_per_million{
     tuple file(probes_gz), file(probes_gz_tbi)
 
     output:
-    tuple idPatient, idSample, file("${idSample}.probe.rpm_rate.bed.gz")  // TBD each output needs to be named for each sample
+    tuple idPatient, idSample, file("${idSample}.probe.rpm_rate.bed.gz"), file("${idSample}.probe.rpm_rate.bed.gz.tbi")
 
     script:
     """
@@ -98,6 +283,7 @@ process get_probe_reads_per_million{
     --regions_file $probes_gz \
     --num_reads $total_reads \
     | bgzip -c > ${idSample}.probe.rpm_rate.bed.gz
+    tabix -p bed ${idSample}.probe.rpm_rate.bed.gz
     """
 }
 
@@ -167,10 +353,13 @@ process get_regions_zscores {
     publishDir "${params.outdir}/CNV_Plotting/RegionZscores", mode: params.publish_dir_mode
 
     input:
-    file(probe_coverage_rate_bed_gz) // all the outputs from exon_coverage_rates
+    tuple sid, file(all_rpm_files)// all the outputs from exon_coverage_rates
+    // tuple sid, file(proband_rpm_gz), file(proband_rpm_gz_tbi) // all the outputs from exon_coverage_rates
 
     output:
-    tuple file("probe.cover.mean.stdev.bed.gz"), file("probe.cover.mean.stdev.bed.gz.tbi"), file("probe.cover.mean.stdev.bed")
+    // removing the sid for now, it will be needed though
+    //tuple file("probe.cover.mean.stdev.bed.gz"), file("probe.cover.mean.stdev.bed.gz.tbi"), file("probe.cover.mean.stdev.bed")
+    tuple sid, file("probe.cover.mean.stdev.bed.gz"), file("probe.cover.mean.stdev.bed.gz.tbi"), file("probe.cover.mean.stdev.bed")
 
     script:
     """
@@ -191,10 +380,11 @@ process get_probe_cover_mean_std {
     publishDir "${params.outdir}/CNV_Plotting/ProbeCoverMeanSTD", mode: params.publish_dir_mode
 
     input:
-    tuple file(probe_coverage_rate_bed_gz), file(probe_coverage_rate_bed_gz_tbi)// all the outputs from exon_coverage_rates
+    tuple sid, file(all_rpm_files)// all the outputs from exon_coverage_rates
+    //tuple sid, file(probe_coverage_rate_bed_gz), file(probe_coverage_rate_bed_gz_tbi)// all the outputs from exon_coverage_rates
 
     output:
-    tuple file("probe.cover.mean.stdev.bed.gz"), file("probe.cover.mean.stdev.bed.gz.tbi"), file("probe.cover.mean.stdev.bed")
+    tuple sid, file("probe.cover.mean.stdev.bed.gz"), file("probe.cover.mean.stdev.bed.gz.tbi"), file("probe.cover.mean.stdev.bed")
 
     script:
     """
@@ -212,22 +402,22 @@ process get_adj_zscore{
     label 'container_llab'
     label 'cpus_1'
 
-    publishDir "${params.outdir}/CNV_Plotting/${idSample}/AdjZscore", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/CNV_Plotting/${sid}/AdjZscore", mode: params.publish_dir_mode
 
     input:
-    tuple idPatient, idSample, file(coverage_rate_bed_gz), file(coverage_rate_bed_gz_tbi) //out out from exon_coverage_rates
-    tuple file(exon_coverage_bed_gz), file(exon_coverage_bed_gz_tbi) //out put from get_regions_zscores
+    tuple file(all_rpm_files) // combine_rpm_files output
+    tuple sid, file(coverage_rate_bed_gz), file(coverage_rate_bed_gz_tbi), file(coverage_rate_bed) //out out from get_regions_zscores.out
 
     output:
-    tuple idPatient, idSample, file("${idSample}.adj_z.bed.gz"), file("${idSample}.adj_z.bed.gz.tbi")
+    tuple sid, file("${sid}.adj_z.bed.gz"), file("${sid}.adj_z.bed.gz.tbi")
 
     script:
     """
     get_coverage_zscores.py \
-        -r $coverage_rate_bed_gz \
-        -s $exon_coverage_bed_gz \
-        | bgzip -c > ${idSample}.adj_z.bed.gz
-    tabix -p bed ${idSample}.adj_z.bed.gz
+        -r ${sid}.probe.rpm_rate.bed.gz \
+        -s $coverage_rate_bed_gz \
+        | bgzip -c > ${sid}.adj_z.bed.gz
+    tabix -p bed ${sid}.adj_z.bed.gz
     """
 }
 
@@ -235,13 +425,13 @@ process merge_adj_scores{
     label 'container_llab'
     label 'cpus_1'
 
-    publishDir "${params.outdir}/CNV_Plotting/MergeAdjZscore", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/CNV_Plotting/MergeAdjZscore/${sid}/", mode: params.publish_dir_mode
 
     input:
-    file(bed_gz) // collected output from get_adj_zscore
+    tuple sid, file(adj_z_bed_gz), file(adj_z_bed_gz_tbi) // collected output from get_adj_zscore
 
     output:
-    tuple file("adj_scores.bed.gz"), file("adj_scores.bed.gz.tbi")
+    tuple sid, file("adj_scores.bed.gz"), file("adj_scores.bed.gz.tbi")
 
     script:
     """

@@ -288,7 +288,7 @@ include {ConcatVCF} from './lib/wf_haplotypecaller'
 include {wf_alamut} from './lib/alamut'
 include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC; add_cohort_vc_to_qc_report; add_cohort_CNVs_to_qc_report} from './lib/wf_quality_control'
 include {manta_to_bed; savvy_to_bed; combine_callers; combine_samples; cnvkit_to_bed} from './lib/wf_agg_cnv'
-include {wf_cnv_data_prepossessing; combine_savvy_calls; cnv_plotter} from './lib/wf_cnv_plotting.nf'
+include {wf_cnv_data_prepossessing; combine_savvy_calls; cnv_plotter; wf_cnv_build_panel_db; wf_cnv_build_proband_db; wf_CNViz_compile} from './lib/wf_cnv_plotting.nf'
 
 workflow{
 
@@ -421,7 +421,7 @@ workflow{
             ch_dict
             )
 
-    wf_cnv_data_prepossessing(ch_bam_marked,ch_target_bed,ch_fasta,ch_fasta_fai,ch_dict,ch_genes_file)
+    //wf_cnv_data_prepossessing(ch_bam_marked,ch_target_bed,ch_fasta,ch_fasta_fai,ch_dict,ch_genes_file)
 
 / At this point we have the following bams:
 a) raw unmarked bams
@@ -726,13 +726,29 @@ c) recalibrated bams
     savvy_to_bed(wf_savvy_cnv_somatic.out.savvy_output,ch_exons_bed_file)
     combine_savvy_calls(wf_savvy_cnv_somatic.out.savvy_param_output.collect())
     ch_savvy_calls = combine_savvy_calls.out.splitText(){it.split("\t")}.map{ x -> [x[0],x[1],x[2],x[3],x[4]] }
-    cnv_plotter(wf_cnv_data_prepossessing.out.allele_balance,
-        wf_cnv_data_prepossessing.out.adj_probe_scores,
-        wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect(),
-        wf_cnv_data_prepossessing.out.labeled_exons,
-        wf_cnv_data_prepossessing.out.probe_cover_mean_std,
-        ch_savvy_calls,
-        wf_savvy_cnv_somatic.out.savvy_param_output.collect())
+    
+    //cnv_plotter(wf_cnv_data_prepossessing.out.allele_balance,
+    //    wf_cnv_data_prepossessing.out.adj_probe_scores,
+    //    wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect(),
+    //    wf_cnv_data_prepossessing.out.labeled_exons,
+    //    wf_cnv_data_prepossessing.out.probe_cover_mean_std,
+    //    ch_savvy_calls,
+    //    wf_savvy_cnv_somatic.out.savvy_param_output.collect())
+
+    wf_cnv_build_panel_db(ch_bam_marked, ch_target_bed, wf_savvy_cnv_somatic.out.savvy_param_output.collect(), wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect())
+    cnviz_vcfs = wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [sid,vcf,tbi]}
+    cnviz_bams = ch_bam_marked.map{pid,sid,bam,bai -> [sid,bam,bai]}
+    cnviz_bams_vcfs = cnviz_vcfs.join(cnviz_bams,remainder: true)
+    wf_cnv_build_proband_db(cnviz_bams_vcfs,
+                            ch_target_bed,
+                            wf_savvy_cnv_somatic.out.savvy_param_output.collect())
+    wf_CNViz_compile(wf_cnv_build_proband_db.out.db, wf_cnv_build_panel_db.out.db, ch_genes_file)
+    //wf_cnv_build_proband_db(
+    //    ch_bam_marked.join(vcfs_for_cnviz) 
+    //    ch_bam_marked,
+    //    ch_target_bed,
+    //    wf_savvy_cnv_somatic.out.savvy_param_output.collect(),
+    //    wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect())
 
     ch_cnvkit_beds = Channel.empty()
     if ( ('cnvkit_single' in tools ) || ('cnvkit_gen_ref' in tools ) ){
