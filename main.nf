@@ -750,6 +750,26 @@ c) recalibrated bams
     //    wf_savvy_cnv_somatic.out.savvy_param_output.collect(),
     //    wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect())
 
+    // ch_savvy_calls = ch_savvy_calls.map{reg, sv, id, fname, reg2 -> [id,reg,sv,fname,reg2]}
+
+    //savvy_stats_combo = wf_CNViz_compile.out.probe_cover_mean_std.join(ch_savvy_calls)
+
+    //println(savvy_stats_combo.view())
+    //savvy_stats_combo.view()
+
+    cnv_plotter( wf_CNViz_compile.out.adj_probe_scores,
+        wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect(),
+        wf_CNViz_compile.out.labeled_exons,
+        wf_CNViz_compile.out.probe_cover_mean_std.collect(),
+        ch_savvy_calls,
+        wf_savvy_cnv_somatic.out.savvy_param_output.collect())
+
+    //cnv_plotter( wf_CNViz_compile.out.adj_probe_scores,
+    //    wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect(),
+    //    wf_CNViz_compile.out.labeled_exons,
+    //    savvy_stats_combo,
+    //    wf_savvy_cnv_somatic.out.savvy_param_output.collect())
+
     ch_cnvkit_beds = Channel.empty()
     if ( ('cnvkit_single' in tools ) || ('cnvkit_gen_ref' in tools ) ){
         cnvkit_to_bed(wf_cnvkit_single.out.cns_tuple,ch_exons_bed_file)

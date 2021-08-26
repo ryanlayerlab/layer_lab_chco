@@ -65,7 +65,7 @@ workflow wf_CNViz_compile{
 
     get_adj_zscore(combine_rpm_files.out.map{id,files -> [files]}, get_regions_zscores.out)
     get_probe_cover_mean_std(combine_rpm_files.out)
-    merge_adj_scores(get_adj_zscore.out)
+    merge_adj_scores(get_adj_zscore.out.collect())
 
     
     // allele balance portion
@@ -75,9 +75,9 @@ workflow wf_CNViz_compile{
     label_exons(genes_file)
 
     emit:
-    combine_rpm_files.out
+    rpm = combine_rpm_files.out
     adj_probe_scores = merge_adj_scores.out
-    //labeled_exons = label_exons.out
+    labeled_exons = label_exons.out
     probe_cover_mean_std = get_probe_cover_mean_std.out
 
     
@@ -384,15 +384,15 @@ process get_probe_cover_mean_std {
     //tuple sid, file(probe_coverage_rate_bed_gz), file(probe_coverage_rate_bed_gz_tbi)// all the outputs from exon_coverage_rates
 
     output:
-    tuple sid, file("probe.cover.mean.stdev.bed.gz"), file("probe.cover.mean.stdev.bed.gz.tbi"), file("probe.cover.mean.stdev.bed")
+    tuple file("${sid}_probe.cover.mean.stdev.bed.gz"), file("${sid}_probe.cover.mean.stdev.bed.gz.tbi"), file("${sid}_probe.cover.mean.stdev.bed")
 
     script:
     """
-    get_regions_zscores.py -r ./ | bgzip -c > probe.cover.mean.stdev.bed.gz
-    cp probe.cover.mean.stdev.bed.gz copy_probe.cover.mean.stdev.bed.gz
-    gunzip copy_probe.cover.mean.stdev.bed.gz 
-    cp copy_probe.cover.mean.stdev.bed probe.cover.mean.stdev.bed
-    tabix -p bed probe.cover.mean.stdev.bed.gz
+    get_regions_zscores.py -r ./ | bgzip -c > ${sid}_probe.cover.mean.stdev.bed.gz
+    cp ${sid}_probe.cover.mean.stdev.bed.gz ${sid}_copy_probe.cover.mean.stdev.bed.gz
+    gunzip ${sid}_copy_probe.cover.mean.stdev.bed.gz 
+    cp ${sid}_copy_probe.cover.mean.stdev.bed ${sid}_probe.cover.mean.stdev.bed
+    tabix -p bed ${sid}_probe.cover.mean.stdev.bed.gz
     """
 
 }
@@ -428,10 +428,11 @@ process merge_adj_scores{
     publishDir "${params.outdir}/CNV_Plotting/MergeAdjZscore/${sid}/", mode: params.publish_dir_mode
 
     input:
-    tuple sid, file(adj_z_bed_gz), file(adj_z_bed_gz_tbi) // collected output from get_adj_zscore
+    file(all_files) // collected output from get_adj_zscore
+    // tuple sid, file(adj_z_bed_gz), file(adj_z_bed_gz_tbi) // collected output from get_adj_zscore
 
     output:
-    tuple sid, file("adj_scores.bed.gz"), file("adj_scores.bed.gz.tbi")
+    tuple file("adj_scores.bed.gz"), file("adj_scores.bed.gz.tbi")
 
     script:
     """
@@ -587,7 +588,7 @@ process testy2{
 
 }
 
-process cnv_plotter {
+process cnv_plotter_og {
     label 'container_py3_pandas'
     label 'cpus_16'
 
@@ -639,7 +640,54 @@ process cnv_plotter {
 
 }
 
+process cnv_plotter {
+    label 'container_py3_pandas'
+    label 'cpus_16'
 
+    publishDir "${params.outdir}/CNV_Plotting/${sid}/Plots", mode: params.publish_dir_mode
+
+    input:
+    tuple file(adj_scores_bed_gz), file(adj_scores_bed_gz_tbi)
+    // tuple all_caller_type,  all_vcf_idPatient, all_vcf_idSample, file(all_vcf), file(all_vcf_tbi) // should contain all vcfs in the named like ${idSample}.vcf
+    file(all_vcf)
+    tuple file(labeled_exons_bed_gz), file(labeled_exons_bed_gz_tbi) // output from label_exons
+    file(all_probe_cover_files)
+    tuple region, sv_type, sid, filename, region_without_colon
+    file(beds)
+
+    output:
+    file("${sid}.${region_without_colon}.${sv_type}.png")
+
+    script:
+    """
+    for i in *.bed; do
+        if [[ "\$i" != *"probe.cover.mean.stdev.bed" ]]
+        then
+            bedtools sort -i \${i} > \${i}.sorted 2>> error.txt
+            bgzip \${i}.sorted 2>> error.txt
+            tabix -p bed \${i}.sorted.gz 2>> error.txt
+            echo "\${i}.sorted.gz" >> multiple_savvy_calls.txt 2>> error.txt
+        fi
+    done
+
+
+    cnv_plotter.py --sample $sid \
+    --vcf ${sid}.vcf.gz \
+    -o ${sid}.${region_without_colon}.${sv_type}.png \
+    --scores $adj_scores_bed_gz \
+    --exons $labeled_exons_bed_gz \
+    --window 100000 \
+    --height 7 \
+    --width 5 \
+    --region $region \
+    --title "${sid} ${region} ${sv_type}" \
+    --label_exons \
+    --depth ${sid}_probe.cover.mean.stdev.bed \
+    --all_calls multiple_savvy_calls.txt 2>> error.txt
+
+    """
+
+}
 
 
 

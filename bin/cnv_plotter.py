@@ -206,6 +206,8 @@ def get_all_savvy_calls_in_target(savvy_bed_file, target_interval, ignore=None):
     calls = utils.get_intervals_in_region(target_interval, savvy_bed_file,ignore=ignore)
     sample_calls = []
     for call in calls:
+        print(call.data)
+        print(call.data[6])
         curr_sample = call.data[6].split('.')[0]
         sample_calls.append(call)
     return(sample_calls)
@@ -274,6 +276,7 @@ def main():
 
 
     samples = utils.get_header(args.scores)[0].split('\t')[4:]
+    print(samples)
     sample_i = samples.index(args.sample)
     scores = utils.get_intervals_in_region(target_region,
                                            args.scores)
@@ -369,6 +372,8 @@ def main():
         alt_means = list(alt_info['avg'])
         alt_stds = list(alt_info['std'])
         alt_score = list( float(x) for x in alt_info['sample'])
+    else:
+        alt_score = None
 
     lns2b = ax.plot(non_samp_pos,
                    non_samp_xs,
@@ -463,14 +468,16 @@ def main():
                 alpha=0.5)
 
     #lns10 = ax2.scatter([ int(x) for x in alt_xs], alt_score, label='Norm Alt Count', s=1, c='black')
-
-    lns10 = ax2.plot(alt_xs,
+    if alt_score is not None:
+        lns10 = ax2.plot(alt_xs,
                    alt_score,
                    '-o',
                    lw = 0,
                    markersize=1,
                    label='Sample Pop. Alt. Count',
                    c='#ff5025')
+    else:
+        lns10 = None
 
     format_axis(ax, args)
 
@@ -526,11 +533,16 @@ def main():
         for i,calls in enumerate(all_calls):
             if len(calls) == 0: continue
             for call in calls:
+                print('i=',str(i))
+                print('num_colors',str(len(call_colors)))
                 if number_of_calls_to_plot == 0: break
                 ymin = 1.0 / number_of_calls_to_plot * box_num
                 ymax = ymin + (1.0 / number_of_calls_to_plot)
-                mark_intervals(ax, [call], call_colors[i],a=0.2,ymin=ymin,ymax=ymax)
-                mark_intervals(ax2, [call], call_colors[i],a=0.2,ymin=ymin,ymax=ymax)
+                color_i = i % len(call_colors)
+                if i > len(call_colors):
+                    print('Warning, too many samples, colors are being recycled')
+                mark_intervals(ax, [call], call_colors[color_i],a=0.2,ymin=ymin,ymax=ymax)
+                mark_intervals(ax2, [call], call_colors[color_i],a=0.2,ymin=ymin,ymax=ymax)
                 box_num += 1
 
     if args.exons:
@@ -616,7 +628,14 @@ def main():
 #
 #
     #lns = lns1 + lns2 + lns3 + lns4 + lns5 + lns6 + lns7
-    lns = lns1 + lns2 + lns8 + lns10 + lns2b
+    lns_to_include = [lns1, lns2, lns8, lns10, lns2b]
+    lns = None
+    for x in lns_to_include:
+        if x is not None:
+            if lns is None:
+                lns = x
+            else:
+                lns += x
     
     man_plot([axs[3],axs[4]], args.depth, target_region)
     ax2.set_ylabel('Normalized Alt. Allele Count', fontsize=6)
