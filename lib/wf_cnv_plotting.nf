@@ -31,6 +31,24 @@ workflow wf_cnv_build_proband_db{
     db = compile_proband_db.out
 }
 
+process load_panel_db{
+    label 'container_llab'
+    label 'cpus_1'
+    publishDir "${params.outdir}/CNV_Plotting/LoadTestingArea", mode: params.publish_dir_mode
+
+    input:
+        file(panel_dir)
+
+    output:
+        tuple file('ReferencePanel_RPM'),  file('ReferencePanel_Calls'),  file('ReferencePanel_BAM'),  file('ReferencePanel_VCF'), file('ReferencePanel_MosDepth')
+
+
+    script:
+    """
+    cp -r ${panel_dir}/* ./
+    """
+}
+
 workflow wf_cnv_build_panel_db{
     take: _bams_unfiltered
     take: _probes
@@ -60,7 +78,9 @@ workflow wf_CNViz_compile{
 
     main:
     // combine all of the RPM results
-    combine_rpm_files(ref_panel_db,proband_db)
+    println(proband_db.view())
+    proband_db.view()
+    combine_rpm_files(ref_panel_db.collect(),proband_db)
     get_regions_zscores(combine_rpm_files.out)
 
     get_adj_zscore(combine_rpm_files.out.map{id,files -> [files]}, get_regions_zscores.out)
@@ -239,6 +259,7 @@ process mosdepth {
     """
     mosdepth $idSample $bam
     tabix -p bed ${idSample}.per-base.bed.gz
+    touch del.txt
     """
 }
 
@@ -640,6 +661,63 @@ process cnv_plotter_og {
 
 }
 
+process get_max_number_of_calls {
+    label 'container_py3_pandas'
+    label 'cpus_16'
+
+    publishDir "${params.outdir}/CNV_Plotting/${sid}/MaxCalls", mode: params.publish_dir_mode
+
+    input:
+    //tuple file(adj_scores_bed_gz), file(adj_scores_bed_gz_tbi)
+    //file(all_vcf)
+    tuple file(labeled_exons_bed_gz), file(labeled_exons_bed_gz_tbi) // output from label_exons
+    file(all_probe_cover_files)
+    tuple region, sv_type, sid, filename, region_without_colon
+    file(beds)
+
+    output:
+    file("${sid}.${region_without_colon}.${sv_type}.max_num_calls.txt")
+
+    script:
+    """
+    for i in *.bed; do
+        if [[ "\$i" != *"probe.cover.mean.stdev.bed" ]]
+        then
+            bedtools sort -i \${i} > \${i}.sorted 2>> error.txt
+            bgzip \${i}.sorted 2>> error.txt
+            tabix -p bed \${i}.sorted.gz 2>> error.txt
+            echo "\${i}.sorted.gz" >> multiple_savvy_calls.txt 2>> error.txt
+        fi
+    done
+
+    get_max_number_of_calls.py --sample $sid \
+    --exons $labeled_exons_bed_gz \
+    --window 100000 \
+    --region $region \
+    --depth ${sid}_probe.cover.mean.stdev.bed \
+    --all_calls multiple_savvy_calls.txt > ${sid}.${region_without_colon}.${sv_type}.max_num_calls.txt
+    """
+}
+
+process find_max_of_maxes {
+    label 'container_py3_pandas'
+    label 'cpus_16'
+
+    publishDir "${params.outdir}/CNV_Plotting/MaxOfMaxes", mode: params.publish_dir_mode
+
+    input:
+        val all_maxes
+
+    output:
+        file('the_max_num_calls.txt')
+
+    script:
+    """
+    echo $all_maxes > the_max_num_calls.txt
+    #echo "${all_maxes}[*]" | sort -nr | head -1 > the_max_num_calls.txt 
+    """
+}
+
 process cnv_plotter {
     label 'container_py3_pandas'
     label 'cpus_16'
@@ -654,6 +732,9 @@ process cnv_plotter {
     file(all_probe_cover_files)
     tuple region, sv_type, sid, filename, region_without_colon
     file(beds)
+    file(max_num_calls)
+    file(gnomad_sv)
+    file(gnomad_sv_tbi)
 
     output:
     file("${sid}.${region_without_colon}.${sv_type}.png")
@@ -670,7 +751,6 @@ process cnv_plotter {
         fi
     done
 
-
     cnv_plotter.py --sample $sid \
     --vcf ${sid}.vcf.gz \
     -o ${sid}.${region_without_colon}.${sv_type}.png \
@@ -683,6 +763,8 @@ process cnv_plotter {
     --title "${sid} ${region} ${sv_type}" \
     --label_exons \
     --depth ${sid}_probe.cover.mean.stdev.bed \
+    --max_num_calls $max_num_calls \
+    --gnomad_sv $gnomad_sv \
     --all_calls multiple_savvy_calls.txt 2>> error.txt
 
     """

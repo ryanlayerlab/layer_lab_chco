@@ -246,6 +246,11 @@ ch_exons_bed_file = params.exons_bed_file ? Channel.value(file(params.exons_bed_
 ch_genes_file = params.genes_file ? Channel.value(file(params.genes_file)) : "null"
 ch_exons_file = params.exons_file ? Channel.value(file(params.exons_file)) : "null"
 savvy_sizes = params.savvy_sizes ? Channel.from(params.savvy_sizes.split(',')) : Channel.fromList([6000])
+gnomad_sv_file = params.gnomad_sv_file ? Channel.value(file(params.gnomad_sv_file)) : "null"
+gnomad_sv_file_tbi = params.gnomad_sv_file_tbi ? Channel.value(file(params.gnomad_sv_file_tbi)) : "null"
+cnviz_ref_panel_db = params.cnviz_ref_panel_db ? Channel.fromPath(file(params.cnviz_ref_panel_db)) : "null"
+
+gnomad_sv = Channel.value([gnomad_sv_file, gnomad_sv_file_tbi])
 
 /* Create channels for various indices. These channels are either filled by the user parameters or 
 form inside the build_indices workflow */
@@ -288,7 +293,7 @@ include {ConcatVCF} from './lib/wf_haplotypecaller'
 include {wf_alamut} from './lib/alamut'
 include {exonCoverage; onTarget; wf_raw_bam_exonCoverage; insertSize; dnaFingerprint; collectQC; wf_qc_fingerprinting_sites; add_somalier_to_QC; add_cohort_vc_to_qc_report; add_cohort_CNVs_to_qc_report} from './lib/wf_quality_control'
 include {manta_to_bed; savvy_to_bed; combine_callers; combine_samples; cnvkit_to_bed} from './lib/wf_agg_cnv'
-include {wf_cnv_data_prepossessing; combine_savvy_calls; cnv_plotter; wf_cnv_build_panel_db; wf_cnv_build_proband_db; wf_CNViz_compile} from './lib/wf_cnv_plotting.nf'
+include {wf_cnv_data_prepossessing; combine_savvy_calls; cnv_plotter; find_max_of_maxes; get_max_number_of_calls; wf_cnv_build_panel_db; wf_cnv_build_proband_db; wf_CNViz_compile; load_panel_db} from './lib/wf_cnv_plotting.nf'
 
 workflow{
 
@@ -736,13 +741,19 @@ c) recalibrated bams
     //    wf_savvy_cnv_somatic.out.savvy_param_output.collect())
 
     wf_cnv_build_panel_db(ch_bam_marked, ch_target_bed, wf_savvy_cnv_somatic.out.savvy_param_output.collect(), wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect())
+
+    myFileChannel = Channel.fromPath( '/scratch/Shares/layer/workspace/michael_sandbox/layer_lab_chco/results/CNV_Plotting/DB_ReferencePanel' )
+    load_panel_db(cnviz_ref_panel_db)
+
     cnviz_vcfs = wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [sid,vcf,tbi]}
     cnviz_bams = ch_bam_marked.map{pid,sid,bam,bai -> [sid,bam,bai]}
     cnviz_bams_vcfs = cnviz_vcfs.join(cnviz_bams,remainder: true)
+    wf_savvy_cnv_somatic.out.savvy_param_output.collect().view()
     wf_cnv_build_proband_db(cnviz_bams_vcfs,
                             ch_target_bed,
                             wf_savvy_cnv_somatic.out.savvy_param_output.collect())
-    wf_CNViz_compile(wf_cnv_build_proband_db.out.db, wf_cnv_build_panel_db.out.db, ch_genes_file)
+    wf_CNViz_compile(wf_cnv_build_proband_db.out.db, load_panel_db.out, ch_genes_file)
+
     //wf_cnv_build_proband_db(
     //    ch_bam_marked.join(vcfs_for_cnviz) 
     //    ch_bam_marked,
@@ -754,15 +765,25 @@ c) recalibrated bams
 
     //savvy_stats_combo = wf_CNViz_compile.out.probe_cover_mean_std.join(ch_savvy_calls)
 
-    //println(savvy_stats_combo.view())
-    //savvy_stats_combo.view()
+    get_max_number_of_calls(
+        wf_CNViz_compile.out.labeled_exons.collect(),
+        wf_CNViz_compile.out.probe_cover_mean_std.collect(),
+        ch_savvy_calls,
+        wf_savvy_cnv_somatic.out.savvy_param_output.collect())
+
+    find_max_of_maxes(get_max_number_of_calls.out.splitText().map{it -> it.trim()}.collect())
+
+    gnomad_sv.view()
 
     cnv_plotter( wf_CNViz_compile.out.adj_probe_scores,
         wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect(),
         wf_CNViz_compile.out.labeled_exons,
         wf_CNViz_compile.out.probe_cover_mean_std.collect(),
         ch_savvy_calls,
-        wf_savvy_cnv_somatic.out.savvy_param_output.collect())
+        wf_savvy_cnv_somatic.out.savvy_param_output.collect(),
+        find_max_of_maxes.out,
+        gnomad_sv_file,
+        gnomad_sv_file_tbi)
 
     //cnv_plotter( wf_CNViz_compile.out.adj_probe_scores,
     //    wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect(),
