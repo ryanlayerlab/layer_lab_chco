@@ -742,7 +742,6 @@ c) recalibrated bams
 
     wf_cnv_build_panel_db(ch_bam_marked, ch_target_bed, wf_savvy_cnv_somatic.out.savvy_param_output.collect(), wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [vcf,tbi]}.collect())
 
-    myFileChannel = Channel.fromPath( '/scratch/Shares/layer/workspace/michael_sandbox/layer_lab_chco/results/CNV_Plotting/DB_ReferencePanel' )
     load_panel_db(cnviz_ref_panel_db)
 
     cnviz_vcfs = wf_jointly_genotype_gvcf.out.vcf_with_index.map{caller, pid, sid, vcf, tbi -> [sid,vcf,tbi]}
@@ -818,8 +817,8 @@ c) recalibrated bams
     insert_sizes = insertSize.out.files.collect()
     fignerprinting = dnaFingerprint.out.collect()
     vcfs = wf_jointly_genotype_gvcf.out.vcf_with_index.collect()
-    /* Un-comment this eventually
     ch_qc_report = Channel.empty()
+
     collectQC(file(tsv_path), params.outdir,exon_coverages,raw_exon_coverage,insert_sizes,fignerprinting,bcf_stats,vcfs)
     ch_qc_report = collectQC.out
     if('somalier' in  tools){ 
@@ -828,7 +827,6 @@ c) recalibrated bams
     }
     add_cohort_vc_to_qc_report(wf_jointly_genotype_gvcf.out.cohort_vcf_with_index,ch_qc_report)
     add_cohort_CNVs_to_qc_report(combine_samples.out.cnv_all_samples_vcf,combine_samples.out.cnv_all_samples_log,add_cohort_vc_to_qc_report.out)
-    */
 } // end of workflow
 
 

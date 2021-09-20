@@ -64,6 +64,7 @@ for subject in samples.subject.unique():
     # for each sample associated with each patient (subject)
     current_subject_df = samples[samples['subject'] == subject]
     for sample in current_subject_df['sample'].unique().tolist():
+        print(samples)
         if samples.loc[(samples['subject'] == subject) & (samples['sample'] == sample),'status'].values[0] in [0,1]:
             """ Fingerprints """
             fp = pd.read_csv(res_dir + '/QC/{}/FingerPrinting/Normal/{}_DNA_Fingerprint.txt'.format(sample,sample))

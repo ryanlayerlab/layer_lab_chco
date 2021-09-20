@@ -1,0 +1,42 @@
+Bootstrap: docker
+From: debian
+
+%files
+    py3_environment.yml /opt/py3_environment.yml
+
+
+%environment
+    PATH=/opt/miniconda/envs/$(head -1 /opt/py3_environment.yml | cut -d' ' -f2)/bin:$PATH
+
+%post
+
+
+    apt-get update 
+    apt-get -y install build-essential
+
+    conda_base_dir=/opt/miniconda
+    conda_bin_dir="${conda_base_dir}/bin"
+    conda="${conda_bin_dir}/conda"
+    
+    apt-get -y install wget bzip2 procps git binutils bc
+
+    # Get and Install the minconda
+    #wget -c https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh
+    wget -c https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+    /bin/bash miniconda.sh -b -p ${conda_base_dir} && rm -f miniconda.sh
+
+    # create a conda environment for this pipeline:
+    ${conda} env create  -f /opt/py3_environment.yml
+
+    apt-get install -y --no-install-recommends python3 python3-pip python3-wheel python3-setuptools gcc libpq-dev python3-dev
+    ln -s /usr/bin/python3 /usr/bin/python
+    ${conda} install numpy scipy pandas openpyxl xlsxwriter
+    apt-get -y clean
+    rm -rf rm -rf /var/lib/apt/lists/*
+
+    wget https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedtools.static.binary
+    mv bedtools.static.binary /bin/bedtools
+    chmod a+x /bin/bedtools 
+
+    ${conda} install -c bioconda htslib
+    pip install xlrd==1.1.0

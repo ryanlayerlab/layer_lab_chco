@@ -44,6 +44,9 @@ workflow wf_multiqc{
 
 process MultiQC {
     label 'container_sarek'
+    memory '64 GB'
+    cpus 8    
+
     publishDir "${params.outdir}/Reports/MultiQC", mode: params.publish_dir_mode
     input:
         file (multiqcConfig) 
